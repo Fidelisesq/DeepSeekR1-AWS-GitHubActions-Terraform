@@ -177,14 +177,3 @@ resource "aws_route53_record" "deepseek_dns" {
   }
 }
 
-/*
-# Terraform Backend (S3 for State Management)
-terraform {
-  backend "s3" {
-    bucket         = "foz-terraform-state-bucket"
-    key            = "infra.tfstate"
-    region         = "us-east-1"
-    encrypt        = true
-  }
-}
-*/
