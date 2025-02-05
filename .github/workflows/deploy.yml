@@ -51,9 +51,13 @@ jobs:
 
       - name: Terraform Init
         run: terraform init
+        env: 
+            TF_LOG: DEBUG
 
       - name: Terraform Apply
         run: terraform apply -auto-approve
+        env: 
+            TF_LOG: DEBUG
       
       - name: Retrieve Terraform Outputs
         id: tf_outputs
@@ -119,6 +123,8 @@ jobs:
 
       - name: Terraform Init
         run: terraform init -reconfigure
+        env: 
+            TF_LOG: DEBUG
 
       - name: Terraform Destroy
         run:  |
