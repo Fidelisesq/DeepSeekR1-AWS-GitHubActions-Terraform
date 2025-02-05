@@ -129,7 +129,4 @@ jobs:
           terraform init -reconfigure \
             -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
             -backend-config="key=infra.tfstate" \
-            -backend-config="region=${{ secrets.AWS_DEFAULT_REGION }}"
-          terraform destroy -auto-approve -var-file=terraform.tfvars
-        env:
-          TF_LOG: DEBUG
+            -backend-config="
