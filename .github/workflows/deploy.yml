@@ -50,16 +50,16 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_DEFAULT_REGION }}
 
-      # 🔹 Only download state file if it exists
       - name: Check for Existing Terraform State
-        id: check_state
+        id: check_artifact
         run: |
-          echo "Checking if terraform-state artifact exists..."
-          curl -s -o /dev/null -w "%{http_code}" -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-          https://api.github.com/repos/${{ github.repository }}/actions/artifacts | grep -q "200" && echo "exists=true" >> $GITHUB_ENV || echo "exists=false" >> $GITHUB_ENV
+          response=$(gh api repos/${{ github.repository }}/actions/artifacts --jq '.artifacts | map(select(.name == "terraform-state")) | length')
+          echo "ARTIFACT_FOUND=$response" >> $GITHUB_ENV
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Restore Terraform State (if exists)
-        if: env.exists == 'true'
+        if: env.ARTIFACT_FOUND != '0'
         uses: actions/download-artifact@v4.1.8
         with:
           name: terraform-state
@@ -85,6 +85,7 @@ jobs:
         with:
           name: terraform-state
           path: terraform.tfstate
+          retention-days: 5  # Ensure the artifact doesn't expire too soon
 
   destroy:
     runs-on: ubuntu-latest
@@ -104,8 +105,16 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_DEFAULT_REGION }}
 
+      - name: Check for Existing Terraform State
+        id: check_artifact
+        run: |
+          response=$(gh api repos/${{ github.repository }}/actions/artifacts --jq '.artifacts | map(select(.name == "terraform-state")) | length')
+          echo "ARTIFACT_FOUND=$response" >> $GITHUB_ENV
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Restore Terraform State (if exists)
-        if: env.exists == 'true'
+        if: env.ARTIFACT_FOUND != '0'
         uses: actions/download-artifact@v4.1.8
         with:
           name: terraform-state
