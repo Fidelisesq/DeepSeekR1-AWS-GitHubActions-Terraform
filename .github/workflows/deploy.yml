@@ -4,6 +4,15 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      action:
+        description: "Choose action (apply/destroy)"
+        required: true
+        default: "apply"
+        type: choice
+        options:
+          - apply
+          - destroy
 
 jobs:
   deploy_or_destroy:
@@ -26,29 +35,29 @@ jobs:
         run: terraform init
       
       - name: Terraform Apply (on push to main)
-        if: github.event_name == 'push'
+        if: github.event.inputs.action == 'apply' || github.event_name == 'push'
         run: terraform apply -auto-approve
       
       - name: Terraform Destroy (on workflow_dispatch)
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event.inputs.action == 'destroy'
         run: terraform destroy -auto-approve
       
       - name: Retrieve Terraform Outputs (on push to main)
-        if: github.event_name == 'push'
+        if: github.event.inputs.action == 'apply' || github.event_name == 'push'
         id: tf_outputs
         run: |
           echo "EC2_PUBLIC_IP=$(terraform output -raw ec2_public_ip)" >> $GITHUB_ENV
           echo "LB_DNS=$(terraform output -raw lb_url)" >> $GITHUB_ENV
       
       - name: Save SSH Private Key
-        if: github.event_name == 'push'
+        if: github.event.inputs.action == 'apply' || github.event_name == 'push'
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 --decode > ~/.ssh/my-key.pem
           chmod 600 ~/.ssh/my-key.pem
       
       - name: Install Docker on EC2 (on push to main)
-        if: github.event_name == 'push'
+        if: github.event.inputs.action == 'apply' || github.event_name == 'push'
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/my-key.pem ubuntu@${{ env.EC2_PUBLIC_IP }} <<EOF
           sudo apt-get update
@@ -58,7 +67,7 @@ jobs:
           EOF
       
       - name: Deploy DeepSeek Model & WebUI via Docker-Compose (on push to main)
-        if: github.event_name == 'push'
+        if: github.event.inputs.action == 'apply' || github.event_name == 'push'
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/my-key.pem ubuntu@${{ env.EC2_PUBLIC_IP }} <<EOF
           git clone https://github.com/your-repo/deepseek.git
@@ -67,18 +76,18 @@ jobs:
           EOF
       
       - name: Validate WebUI is Running (on push to main)
-        if: github.event_name == 'push'
+        if: github.event.inputs.action == 'apply' || github.event_name == 'push'
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/my-key.pem ubuntu@${{ env.EC2_PUBLIC_IP }} <<EOF
           curl -I http://localhost:8080
           EOF
       
       - name: Validate Load Balancer Access (on push to main)
-        if: github.event_name == 'push'
+        if: github.event.inputs.action == 'apply' || github.event_name == 'push'
         run: |
           curl -I https://${{ env.LB_DNS }}
       
       - name: Validate Access via Custom Domain (on push to main)
-        if: github.event_name == 'push'
+        if: github.event.inputs.action == 'apply' || github.event_name == 'push'
         run: |
           curl -I https://deepseek.fozdigitalz.com
