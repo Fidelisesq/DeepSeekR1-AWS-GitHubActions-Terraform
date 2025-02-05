@@ -44,7 +44,7 @@ jobs:
         uses: hashicorp/setup-terraform@v1
 
       - name: Terraform Init
-        run: terraform init
+        run:  terraform init -backend-config="bucket=foz-terraform-state-bucket" -backend-config="key=infra.tfstate" -backend-config="region=us-east-1"
         env: 
           TF_LOG: DEBUG
 
