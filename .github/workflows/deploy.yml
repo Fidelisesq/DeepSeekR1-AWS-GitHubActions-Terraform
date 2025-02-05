@@ -51,7 +51,7 @@ jobs:
           aws-region: ${{ vars.AWS_DEFAULT_REGION }}
 
       - name: Restore Terraform State
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.8
         with:
           name: terraform-state
           path: ./
@@ -136,7 +136,7 @@ jobs:
           aws-region: ${{ vars.AWS_DEFAULT_REGION }}
 
       - name: Restore Terraform State
-        uses: actions/download-artifact@4.1.8
+        uses: actions/download-artifact@v4.1.8
         with:
           name: terraform-state
           path: ./
