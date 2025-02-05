@@ -15,12 +15,12 @@ on:
           - destroy
 
 jobs:
-  deploy_or_destroy:
+  setup:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v2
-      
+
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v1
       
@@ -33,31 +33,28 @@ jobs:
       
       - name: Terraform Init
         run: terraform init
-      
-      - name: Terraform Apply (on push to main)
-        if: github.event.inputs.action == 'apply' || github.event_name == 'push'
+
+  apply:
+    runs-on: ubuntu-latest
+    needs: setup
+    if: github.event.inputs.action == 'apply' || github.event_name == 'push'
+    steps:
+      - name: Terraform Apply
         run: terraform apply -auto-approve
       
-      - name: Terraform Destroy (on workflow_dispatch)
-        if: github.event.inputs.action == 'destroy'
-        run: terraform destroy -auto-approve
-      
-      - name: Retrieve Terraform Outputs (on push to main)
-        if: github.event.inputs.action == 'apply' || github.event_name == 'push'
+      - name: Retrieve Terraform Outputs
         id: tf_outputs
         run: |
           echo "EC2_PUBLIC_IP=$(terraform output -raw ec2_public_ip)" >> $GITHUB_ENV
           echo "LB_DNS=$(terraform output -raw lb_url)" >> $GITHUB_ENV
       
       - name: Save SSH Private Key
-        if: github.event.inputs.action == 'apply' || github.event_name == 'push'
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 --decode > ~/.ssh/my-key.pem
           chmod 600 ~/.ssh/my-key.pem
       
-      - name: Install Docker on EC2 (on push to main)
-        if: github.event.inputs.action == 'apply' || github.event_name == 'push'
+      - name: Install Docker on EC2
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/my-key.pem ubuntu@${{ env.EC2_PUBLIC_IP }} <<EOF
           sudo apt-get update
@@ -66,8 +63,7 @@ jobs:
           sudo systemctl start docker
           EOF
       
-      - name: Deploy DeepSeek Model & WebUI via Docker-Compose (on push to main)
-        if: github.event.inputs.action == 'apply' || github.event_name == 'push'
+      - name: Deploy DeepSeek Model & WebUI via Docker-Compose
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/my-key.pem ubuntu@${{ env.EC2_PUBLIC_IP }} <<EOF
           git clone https://github.com/your-repo/deepseek.git
@@ -75,19 +71,24 @@ jobs:
           docker-compose up -d
           EOF
       
-      - name: Validate WebUI is Running (on push to main)
-        if: github.event.inputs.action == 'apply' || github.event_name == 'push'
+      - name: Validate WebUI is Running
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/my-key.pem ubuntu@${{ env.EC2_PUBLIC_IP }} <<EOF
           curl -I http://localhost:8080
           EOF
       
-      - name: Validate Load Balancer Access (on push to main)
-        if: github.event.inputs.action == 'apply' || github.event_name == 'push'
+      - name: Validate Load Balancer Access
         run: |
           curl -I https://${{ env.LB_DNS }}
       
-      - name: Validate Access via Custom Domain (on push to main)
-        if: github.event.inputs.action == 'apply' || github.event_name == 'push'
+      - name: Validate Access via Custom Domain
         run: |
           curl -I https://deepseek.fozdigitalz.com
+
+  destroy:
+    runs-on: ubuntu-latest
+    needs: setup
+    if: github.event.inputs.action == 'destroy'
+    steps:
+      - name: Terraform Destroy
+        run: terraform destroy -auto-approve
