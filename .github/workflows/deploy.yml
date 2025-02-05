@@ -65,10 +65,14 @@ jobs:
           aws_access_key_id = "${{ secrets.AWS_ACCESS_KEY_ID }}"
           aws_secret_access_key = "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
           aws_region = "${{ secrets.AWS_DEFAULT_REGION }}"
+          private_subnet_id = "${{ secrets.PRIVATE_SUBNET_ID }}"
           EOF
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init \
+          -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+          -backend-config="key=terraform.tfstate" \
+          -backend-config="region=${{ secrets.AWS_DEFAULT_REGION }}"
         env:
           TF_LOG: DEBUG
 
@@ -81,14 +85,6 @@ jobs:
         run: terraform apply -auto-approve -var-file=terraform.tfvars
         env:
           TF_LOG: DEBUG
-
-      - name: Save Terraform State (Only If Apply Was Successful)
-        if: success()
-        uses: actions/upload-artifact@v4.6.0
-        with:
-          name: terraform-state
-          path: terraform.tfstate
-          retention-days: 5
 
   destroy:
     runs-on: ubuntu-latest
@@ -123,11 +119,16 @@ jobs:
           aws_access_key_id = "${{ secrets.AWS_ACCESS_KEY_ID }}"
           aws_secret_access_key = "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
           aws_region = "${{ secrets.AWS_DEFAULT_REGION }}"
+          private_subnet_id = "${{ secrets.PRIVATE_SUBNET_ID }}"
+          private_subnet_id = "${{ secrets.PRIVATE_SUBNET_ID }}"
           EOF
 
       - name: Terraform Init & Destroy
         run: |
-          terraform init -reconfigure
+          terraform init -reconfigure \
+          -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+          -backend-config="key=terraform.tfstate" \
+          -backend-config="region=${{ secrets.AWS_DEFAULT_REGION }}"
           terraform destroy -auto-approve -var-file=terraform.tfvars
         env:
           TF_LOG: DEBUG
