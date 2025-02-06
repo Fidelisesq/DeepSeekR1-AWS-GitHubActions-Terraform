@@ -95,17 +95,33 @@ jobs:
     needs: apply
     if: success()  # Ensures it runs only if terraform apply was successful
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
       - name: Retrieve Terraform Outputs
         id: tf_outputs
         run: |
-          echo "EC2_PUBLIC_IP=$(terraform output -raw ec2_public_ip)" >> $GITHUB_ENV
-          echo "LB_DNS=$(terraform output -raw lb_url)" >> $GITHUB_ENV
+          echo "Retrieving Terraform Outputs..."
+          EC2_PUBLIC_IP=$(terraform -chdir=./ get output -raw ec2_public_ip)
+          LB_DNS=$(terraform -chdir=./ get output -raw lb_url)
+
+          echo "EC2_PUBLIC_IP=${EC2_PUBLIC_IP}" >> $GITHUB_ENV
+          echo "LB_DNS=${LB_DNS}" >> $GITHUB_ENV
+          
+          echo "EC2 Public IP: ${EC2_PUBLIC_IP}"
+            echo "Load Balancer URL: ${LB_DNS}"
 
       - name: Save SSH Private Key
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 --decode > ~/.ssh/my-key.pem
           chmod 600 ~/.ssh/my-key.pem
+
+      - name: Verify SSH Connection
+        run: |
+           ssh -o StrictHostKeyChecking=no -i ~/.ssh/my-key.pem ubuntu@${{ env.EC2_PUBLIC_IP }} 
+           echo "SSH Connection Successful"
+
 
       - name: Install Docker on EC2
         run: |
