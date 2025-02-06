@@ -78,18 +78,18 @@ jobs:
             -backend-config="bucket=${{ secrets.TERRAFORM_STATE_BUCKET }}" \
             -backend-config="key=infra.tfstate" \
             -backend-config="region=${{ secrets.AWS_DEFAULT_REGION }}"
-        env:
-          TF_LOG: DEBUG
+        #env:
+          #TF_LOG: DEBUG
 
       - name: Terraform Plan
         run: terraform plan -out=tfplan -var-file=terraform.tfvars
-        env:
-          TF_LOG: DEBUG
+        #env:
+          #TF_LOG: DEBUG
 
       - name: Terraform Apply
         run: terraform apply -auto-approve -var-file=terraform.tfvars
-        env:
-          TF_LOG: DEBUG
+        #env:
+          #TF_LOG: DEBUG
 
   post_apply:
     runs-on: ubuntu-latest
@@ -135,8 +135,8 @@ jobs:
           -backend-config="bucket=${{ secrets.TERRAFORM_STATE_BUCKET }}" \
           -backend-config="key=infra.tfstate" \
           -backend-config="region=${{ secrets.AWS_DEFAULT_REGION }}"
-        env:
-          TF_LOG: DEBUG
+        #env:
+          #TF_LOG: DEBUG
 
 
       - name: Retrieve Terraform Outputs
@@ -179,8 +179,8 @@ jobs:
           sudo apt-get install -y docker.io docker-compose
           sudo systemctl enable docker
           sudo systemctl start docker
-          sudo usermod -aG \$USER
-          newgrp docker
+          sudo usermod -aG docker ubuntu
+          sudo reboot
           EOF
 
       - name: Run DeepSeek Model and WebUI via Docker
@@ -261,5 +261,5 @@ jobs:
             -backend-config="key=infra.tfstate" \
             -backend-config="region=${{ secrets.AWS_DEFAULT_REGION }}"
           terraform destroy -auto-approve -var-file=terraform.tfvars
-        env:
-          TF_LOG: DEBUG
+        #env:
+          #TF_LOG: DEBUG
