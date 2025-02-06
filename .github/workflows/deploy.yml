@@ -69,6 +69,7 @@ jobs:
           aws_region = "${{ secrets.AWS_DEFAULT_REGION }}"
           public_subnet_id = "${{ secrets.PUBLIC_SUBNET_ID }}"
           terraform_state_bucket = "${{ secrets.TERRAFORM_STATE_BUCKET }}"
+          security_group_id = ${{ secrets.SECURITY_GROUP_ID }}
           EOF
 
       - name: Terraform Init
@@ -125,6 +126,8 @@ jobs:
             aws_region = "${{ secrets.AWS_DEFAULT_REGION }}"
             public_subnet_id = "${{ secrets.PUBLIC_SUBNET_ID }}"
             terraform_state_bucket = "${{ secrets.TERRAFORM_STATE_BUCKET }}"
+            security_group_id = ${{ secrets.SECURITY_GROUP_ID }}
+            EOF
 
       - name: Terraform Init
         run: |
@@ -143,17 +146,40 @@ jobs:
           echo "EC2_PUBLIC_IP=$(terraform output -raw ec2_public_ip)" >> $GITHUB_ENV
           echo "LB_DNS=$(terraform output -raw lb_url)" >> $GITHUB_ENV
 
+      
+          
       - name: Save SSH Private Key
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 --decode > ~/.ssh/my-key.pem
           chmod 600 ~/.ssh/my-key.pem
 
+      - name: Add GitHub Runner IP to Security Group
+        run: |
+          RUNNER_IP=$(curl -s https://checkip.amazonaws.com)
+            cho "Runner IP: $RUNNER_IP"
+            aws ec2 authorize-security-group-ingress \
+              --group-id ${{ secrets.SECURITY_GROUP_ID }} \
+              --protocol tcp \
+              --port 22 \
+              --cidr $RUNNER_IP/32
+
       - name: Verify SSH Connection
         run: |
            ssh -o StrictHostKeyChecking=no -i ~/.ssh/my-key.pem ubuntu@${{ env.EC2_PUBLIC_IP }} 
            echo "SSH Connection Successful"
 
+      
+      - name: Remove GitHub Runner IP from Security Group
+        if: always()
+        run: |
+          RUNNER_IP=$(curl -s https://checkip.amazonaws.com)
+          echo "Removing Runner IP: $RUNNER_IP"
+          aws ec2 revoke-security-group-ingress \
+            --group-id ${{ secrets.SECURITY_GROUP_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr $RUNNER_IP/32
 
       - name: Install Docker on EC2
         run: |
@@ -221,6 +247,7 @@ jobs:
           aws_region = "${{ secrets.AWS_DEFAULT_REGION }}"
           public_subnet_id = "${{ secrets.PUBLIC_SUBNET_ID }}"
           terraform_state_bucket = "${{ secrets.TERRAFORM_STATE_BUCKET }}"
+          security_group_id = ${{ secrets.SECURITY_GROUP_ID }}
           EOF
 
       - name: Terraform Init & Destroy
