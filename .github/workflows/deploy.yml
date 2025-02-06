@@ -35,7 +35,9 @@ jobs:
   apply:
     runs-on: ubuntu-latest
     needs: setup
-    if: github.event.inputs.action == 'apply' || github.event_name == 'push'
+    if: |
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply') ||
+      (github.event_name == 'push' && !contains(github.event.head_commit.message, 'destroy'))
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -88,11 +90,58 @@ jobs:
         env:
           TF_LOG: DEBUG
 
+  post_apply:
+    runs-on: ubuntu-latest
+    needs: apply
+    if: success()  # Ensures it runs only if terraform apply was successful
+    steps:
+      - name: Retrieve Terraform Outputs
+        id: tf_outputs
+        run: |
+          echo "EC2_PUBLIC_IP=$(terraform output -raw ec2_public_ip)" >> $GITHUB_ENV
+          echo "LB_DNS=$(terraform output -raw lb_url)" >> $GITHUB_ENV
+
+      - name: Save SSH Private Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 --decode > ~/.ssh/my-key.pem
+          chmod 600 ~/.ssh/my-key.pem
+
+      - name: Install Docker on EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/my-key.pem ubuntu@${{ env.EC2_PUBLIC_IP }} <<EOF
+          sudo apt-get update
+          sudo apt-get install -y docker.io docker-compose
+          sudo systemctl enable docker
+          sudo systemctl start docker
+          EOF
+
+      - name: Run DeepSeek Model and WebUI via Docker
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/my-key.pem ubuntu@${{ env.EC2_PUBLIC_IP }} <<EOF
+          docker run -d -p 8080:8080 --name deepseek-webui openwebui/ollama-webui
+          EOF
+
+      - name: Confirm WebUI is Running
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/my-key.pem ubuntu@${{ env.EC2_PUBLIC_IP }} <<EOF
+          curl -I http://localhost:8080
+          EOF
+
+      - name: Confirm Load Balancer is Exposing the WebUI
+        run: |
+          curl -I https://${{ env.LB_DNS }}
+
+      - name: Validate Access via Custom Domain
+        run: |
+          curl -I https://deepseek.fozdigitalz.com
+
   destroy:
     runs-on: ubuntu-latest
     needs: setup
-    #if: github.event.inputs.action == 'destroy'
-    if: (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy')
+    if: |
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy') ||
+      (github.event_name == 'push' && contains(github.event.head_commit.message, 'destroy'))
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
