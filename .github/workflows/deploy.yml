@@ -66,13 +66,13 @@ jobs:
           aws_secret_access_key = "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
           aws_region = "${{ secrets.AWS_DEFAULT_REGION }}"
           private_subnet_id = "${{ secrets.PRIVATE_SUBNET_ID }}"
-          tf_state_bucket = "${{ secrets.TF_STATE_BUCKET }}"
+          terraform_state_bucket = "${{ secrets.TERRAFORM_STATE_BUCKET }}"
           EOF
 
       - name: Terraform Init
         run: |
           terraform init \
-            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="bucket=${{ secrets.TERRAFORM_STATE_BUCKET }}" \
             -backend-config="key=infra.tfstate" \
             -backend-config="region=${{ secrets.AWS_DEFAULT_REGION }}"
         env:
@@ -122,13 +122,13 @@ jobs:
           aws_secret_access_key = "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
           aws_region = "${{ secrets.AWS_DEFAULT_REGION }}"
           private_subnet_id = "${{ secrets.PRIVATE_SUBNET_ID }}"
-          tf_state_bucket = "${{ secrets.TF_STATE_BUCKET }}"
+          terraform_state_bucket = "${{ secrets.TERRAFORM_STATE_BUCKET }}"
           EOF
 
       - name: Terraform Init & Destroy
         run: |
           terraform init -reconfigure \
-            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="bucket=${{ secrets.TERRAFORM_STATE_BUCKET }}" \
             -backend-config="key=infra.tfstate" \
             -backend-config="region=${{ secrets.AWS_DEFAULT_REGION }}"
           terraform destroy -auto-approve -var-file=terraform.tfvars
