@@ -92,10 +92,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: setup
     #if: github.event.inputs.action == 'destroy'
-    if: |
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy') ||
-      (github.event_name == 'push' && contains(github.event.head_commit.message, 'destroy'))
-
+    if: (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy')
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
