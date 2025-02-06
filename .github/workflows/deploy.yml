@@ -180,6 +180,7 @@ jobs:
           sudo systemctl enable docker
           sudo systemctl start docker
           sudo usermod -aG docker ubuntu
+          sudo sed -i 's/^ENABLED=1/ENABLED=0/' /etc/apt/apt.conf.d/20auto-upgrades
           sudo reboot
           EOF
 
@@ -191,6 +192,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/my-key.pem ubuntu@${{ env.EC2_PUBLIC_IP }} <<EOF
           docker run -d -p 8080:8080 --name deepseek-webui openwebui/ollama-webui
+          docker run -d --name deepseek-model deepseek-model:latest
           EOF
 
       - name: Confirm WebUI is Running
