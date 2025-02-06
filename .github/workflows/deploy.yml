@@ -147,7 +147,6 @@ jobs:
           echo "LB_DNS=$(terraform output -raw lb_url)" >> $GITHUB_ENV
 
       
-          
       - name: Save SSH Private Key
         run: |
           mkdir -p ~/.ssh
@@ -157,7 +156,7 @@ jobs:
       - name: Add GitHub Runner IP to Security Group
         run: |
           RUNNER_IP=$(curl -s https://checkip.amazonaws.com)
-            cho "Runner IP: $RUNNER_IP"
+            echo "Runner IP: $RUNNER_IP"
             aws ec2 authorize-security-group-ingress \
               --group-id ${{ secrets.SECURITY_GROUP_ID }} \
               --protocol tcp \
