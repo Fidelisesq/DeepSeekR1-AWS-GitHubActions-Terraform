@@ -179,6 +179,8 @@ jobs:
           sudo apt-get install -y docker.io docker-compose
           sudo systemctl enable docker
           sudo systemctl start docker
+          sudo usermod -aG \$USER
+          newgrp docker
           EOF
 
       - name: Run DeepSeek Model and WebUI via Docker
