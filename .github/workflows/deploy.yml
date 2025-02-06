@@ -183,6 +183,10 @@ jobs:
           sudo reboot
           EOF
 
+      - name: Wait for EC2 Instance to Reboot
+        run: sleep 60
+
+
       - name: Run DeepSeek Model and WebUI via Docker
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/my-key.pem ubuntu@${{ env.EC2_PUBLIC_IP }} <<EOF
