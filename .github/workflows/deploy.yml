@@ -67,7 +67,7 @@ jobs:
           aws_access_key_id = "${{ secrets.AWS_ACCESS_KEY_ID }}"
           aws_secret_access_key = "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
           aws_region = "${{ secrets.AWS_DEFAULT_REGION }}"
-          private_subnet_id = "${{ secrets.PRIVATE_SUBNET_ID }}"
+          public_subnet_id = "${{ secrets.PUBLIC_SUBNET_ID }}"
           terraform_state_bucket = "${{ secrets.TERRAFORM_STATE_BUCKET }}"
           EOF
 
@@ -102,14 +102,8 @@ jobs:
         id: tf_outputs
         run: |
           echo "Retrieving Terraform Outputs..."
-          EC2_PUBLIC_IP=$(terraform -chdir=./ get output -raw ec2_public_ip)
-          LB_DNS=$(terraform -chdir=./ get output -raw lb_url)
-
-          echo "EC2_PUBLIC_IP=${EC2_PUBLIC_IP}" >> $GITHUB_ENV
-          echo "LB_DNS=${LB_DNS}" >> $GITHUB_ENV
-          
-          echo "EC2 Public IP: ${EC2_PUBLIC_IP}"
-            echo "Load Balancer URL: ${LB_DNS}"
+          echo "EC2_PUBLIC_IP=$(terraform -raw ec2_public_ip)" >> $GITHUB_ENV
+          echo "LB_DNS=$(terraform output -raw lb_url)" >> $GITHUB_ENV
 
       - name: Save SSH Private Key
         run: |
@@ -187,7 +181,7 @@ jobs:
           aws_access_key_id = "${{ secrets.AWS_ACCESS_KEY_ID }}"
           aws_secret_access_key = "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
           aws_region = "${{ secrets.AWS_DEFAULT_REGION }}"
-          private_subnet_id = "${{ secrets.PRIVATE_SUBNET_ID }}"
+          public_subnet_id = "${{ secrets.PUBLIC_SUBNET_ID }}"
           terraform_state_bucket = "${{ secrets.TERRAFORM_STATE_BUCKET }}"
           EOF
 

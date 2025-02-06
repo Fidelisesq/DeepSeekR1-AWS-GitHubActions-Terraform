@@ -142,7 +142,7 @@ resource "aws_instance" "deepseek_ec2" {
   ami             = var.ami_id
   instance_type   = var.instance_type
   key_name        = data.aws_key_pair.existing_key.key_name
-  subnet_id       = var.private_subnet_id
+  subnet_id       = var.public_subnet_id
   security_groups = [aws_security_group.deepseek_ec2_sg.id]
   iam_instance_profile = aws_iam_instance_profile.deepseek_ec2_profile.name
 

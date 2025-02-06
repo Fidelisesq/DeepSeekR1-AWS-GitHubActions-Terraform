@@ -13,9 +13,15 @@ variable "subnet_ids" {
   description = "Subnet ID for the ALB"
   type        = list(string)
 }
-
+/*
 variable "private_subnet_id" {
   description = "Private subnet ID for the EC2 instance"
+  type        = string
+}
+*/
+
+variable "public_subnet_id" {
+  description = "Public subnet ID for the EC2 instance"
   type        = string
 }
 
