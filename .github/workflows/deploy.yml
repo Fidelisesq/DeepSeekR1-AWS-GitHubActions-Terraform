@@ -67,6 +67,7 @@ jobs:
           aws_region = "${{ secrets.AWS_DEFAULT_REGION }}"
           private_subnet_id = "${{ secrets.PRIVATE_SUBNET_ID }}"
           tf_state_bucket = "${{ secrets.TF_STATE_BUCKET }}"
+          terraform_state_bucket = "${{ secrets.terraform_state_bucket }}"
           EOF
 
       - name: Terraform Init
@@ -123,6 +124,7 @@ jobs:
           aws_region = "${{ secrets.AWS_DEFAULT_REGION }}"
           private_subnet_id = "${{ secrets.PRIVATE_SUBNET_ID }}"
           tf_state_bucket = "${{ secrets.TF_STATE_BUCKET }}"
+          terraform_state_bucket = "${{ secrets.terraform_state_bucket }}"
           EOF
 
       - name: Terraform Init & Destroy

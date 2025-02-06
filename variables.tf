@@ -59,3 +59,4 @@ variable "my_ip" {
   description = "IP address allowed to SSH"
   type        = string
 }
+
