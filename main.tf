@@ -29,7 +29,7 @@ resource "aws_security_group" "alb_sg" {
   ingress {
     from_port = 11434
     to_port = 11434
-    protocol = "tcp"
+    protocol = "HTTP"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -68,7 +68,7 @@ resource "aws_security_group" "deepseek_ec2_sg" {
   ingress {
     from_port = 11434
     to_port = 11434
-    protocol = "TCP"
+    protocol = "HTTP"
     security_groups = [aws_security_group.alb_sg.id]
   }
 
@@ -127,7 +127,7 @@ resource "aws_lb_listener" "http_listener" {
 resource "aws_lb_listener" "ollama_listener" {
   load_balancer_arn = aws_lb.deepseek_lb.arn
   port              = 11434
-  protocol          = "TCP"
+  protocol          = "HTTP"
 
   default_action {
     type             = "forward"
@@ -155,7 +155,7 @@ resource "aws_lb_target_group" "deepseek_tg" {
 resource "aws_lb_target_group" "ollama_api_tg" {
   name       = "ollama-api-target-group"
   port       = 11434
-  protocol   = "TCP"
+  protocol   = "HTTP"
   target_type = "instance"
   vpc_id     = var.vpc_id
 
