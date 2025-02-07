@@ -148,17 +148,17 @@ jobs:
         id: get_sg_id
         run:  |
           SECURITY_GROUP_ID=$(terraform output -raw deepseek_ec2_sg_id)
-          echo "SECURITY_GROUP_ID"=$SECURITY_GROUP_ID" >> $GITHUB_ENV
+          echo "SECURITY_GROUP_ID=$SECURITY_GROUP_ID" >> $GITHUB_ENV
         
       - name: Add GitHub Runner IP to Security Group
         run: |
           RUNNER_IP=$(curl -s https://checkip.amazonaws.com)
           echo "Runner IP: $RUNNER_IP"
           aws ec2 authorize-security-group-ingress \
-            --group-id ${{ env.SECURITY_GROUP_ID }} \
+            --group-id "${{ env.SECURITY_GROUP_ID }}" \
             --protocol tcp \
             --port 22 \
-            --cidr $RUNNER_IP/32 || echo "Faled to add rule to EC2 Security Group"
+            --cidr "$RUNNER_IP/32" || echo "Failed to add rule to EC2 Security Group"
       
       - name: Wait for Security Group to Update
         run: sleep 12
@@ -217,10 +217,10 @@ jobs:
             RUNNER_IP=$(curl -s https://checkip.amazonaws.com)
             echo "Removing Runner IP: $RUNNER_IP"
             aws ec2 revoke-security-group-ingress \
-              --group-id ${{ env.SECURITY_GROUP_ID }} \
+              --group-id "${{ env.SECURITY_GROUP_ID }}" \
               --protocol tcp \
               --port 22 \
-              --cidr $RUNNER_IP/32
+              --cidr "$RUNNER_IP/32"
 
   destroy:
     runs-on: ubuntu-latest
