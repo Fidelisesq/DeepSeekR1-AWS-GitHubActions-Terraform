@@ -13,7 +13,7 @@ resource "aws_security_group" "alb_sg" {
   ingress {
     from_port   = 443
     to_port     = 443
-    protocol    = "TCP"
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -29,7 +29,7 @@ resource "aws_security_group" "alb_sg" {
   ingress {
     from_port = 11434
     to_port = 11434
-    protocol = "HTTPS"
+    protocol = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -64,11 +64,11 @@ resource "aws_security_group" "deepseek_ec2_sg" {
     cidr_blocks = ["${var.my_ip}/32"] # Change to your IP for security
   }
 
-  #Allow tcp traffic on port 11434 from ALN
+  #Allow tcp traffic on port 11434 from ALB
   ingress {
     from_port = 11434
     to_port = 11434
-    protocol = "HTTPS"
+    protocol = "tcp"
     security_groups = [aws_security_group.alb_sg.id]
   }
 
