@@ -29,7 +29,7 @@ resource "aws_security_group" "alb_sg" {
   ingress {
     from_port = 11434
     to_port = 11434
-    protocol = "HTTP"
+    protocol = "HTTPS"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -68,7 +68,7 @@ resource "aws_security_group" "deepseek_ec2_sg" {
   ingress {
     from_port = 11434
     to_port = 11434
-    protocol = "HTTP"
+    protocol = "HTTPS"
     security_groups = [aws_security_group.alb_sg.id]
   }
 
@@ -127,7 +127,7 @@ resource "aws_lb_listener" "http_listener" {
 resource "aws_lb_listener" "ollama_listener" {
   load_balancer_arn = aws_lb.deepseek_lb.arn
   port              = 11434
-  protocol          = "HTTP"
+  protocol          = "HTTPS"
 
   default_action {
     type             = "forward"
