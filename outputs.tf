@@ -14,3 +14,8 @@ output "lb_url" {
   description = "DNS name of the ALB"
   value       = aws_lb.deepseek_lb.dns_name
 }
+
+output "deepseek_ec2_sg_id" {
+  value = aws_security_group.deepseek_ec2_sg.id
+}
+

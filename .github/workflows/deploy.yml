@@ -69,7 +69,6 @@ jobs:
           aws_region = "${{ secrets.AWS_DEFAULT_REGION }}"
           public_subnet_id = "${{ secrets.PUBLIC_SUBNET_ID }}"
           terraform_state_bucket = "${{ secrets.TERRAFORM_STATE_BUCKET }}"
-          security_group_id = ${{ secrets.SECURITY_GROUP_ID }}
           EOF
 
       - name: Terraform Init
@@ -126,7 +125,6 @@ jobs:
             aws_region = "${{ secrets.AWS_DEFAULT_REGION }}"
             public_subnet_id = "${{ secrets.PUBLIC_SUBNET_ID }}"
             terraform_state_bucket = "${{ secrets.TERRAFORM_STATE_BUCKET }}"
-            security_group_id = ${{ secrets.SECURITY_GROUP_ID }}
             EOF
 
       - name: Terraform Init
@@ -146,25 +144,31 @@ jobs:
           echo "EC2_PUBLIC_IP=$(terraform output -raw ec2_public_ip)" >> $GITHUB_ENV
           echo "LB_DNS=$(terraform output -raw lb_url)" >> $GITHUB_ENV
 
+      - name: Retrieve EC2 Security Group ID
+        id: get_sg_id
+        run:  |
+          SECURITY_GROUP_ID=$(terraform output -raw deepseek_ec2_sg_id)
+          echo "SECURITY_GROUP_ID"=$SECURITY_GROUP_ID" >> $GITHUB_ENV
+        
+      - name: Add GitHub Runner IP to Security Group
+        run: |
+          RUNNER_IP=$(curl -s https://checkip.amazonaws.com)
+          echo "Runner IP: $RUNNER_IP"
+          aws ec2 authorize-security-group-ingress \
+            --group-id ${{ env.SECURITY_GROUP_ID }} \
+            --protocol tcp \
+            --port 22 \
+            --cidr $RUNNER_IP/32 || echo "Faled to add rule to EC2 Security Group"
       
+      - name: Wait for Security Group to Update
+        run: sleep 12
+
       - name: Save SSH Private Key
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 --decode > ~/.ssh/my-key.pem
           chmod 600 ~/.ssh/my-key.pem
 
-      - name: Add GitHub Runner IP to Security Group
-        run: |
-          RUNNER_IP=$(curl -s https://checkip.amazonaws.com)
-            echo "Runner IP: $RUNNER_IP"
-            aws ec2 authorize-security-group-ingress \
-              --group-id ${{ secrets.SECURITY_GROUP_ID }} \
-              --protocol tcp \
-              --port 22 \
-              --cidr $RUNNER_IP/32 || echo "Faled to add rule to EC2 Security Group"
-
-      - name: Wait for Security Group to Update
-        run: sleep 12
 
       - name: Verify SSH Connection
         run: |
@@ -213,7 +217,7 @@ jobs:
             RUNNER_IP=$(curl -s https://checkip.amazonaws.com)
             echo "Removing Runner IP: $RUNNER_IP"
             aws ec2 revoke-security-group-ingress \
-              --group-id ${{ secrets.SECURITY_GROUP_ID }} \
+              --group-id ${{ env.SECURITY_GROUP_ID }} \
               --protocol tcp \
               --port 22 \
               --cidr $RUNNER_IP/32
@@ -255,7 +259,6 @@ jobs:
           aws_region = "${{ secrets.AWS_DEFAULT_REGION }}"
           public_subnet_id = "${{ secrets.PUBLIC_SUBNET_ID }}"
           terraform_state_bucket = "${{ secrets.TERRAFORM_STATE_BUCKET }}"
-          security_group_id = ${{ secrets.SECURITY_GROUP_ID }}
           EOF
 
       - name: Terraform Init & Destroy
