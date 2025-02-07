@@ -194,22 +194,16 @@ jobs:
           docker run -d -v ollama:/root/.ollama -p 8080:11434 --name ollama ollama/ollama
           sleep 20
           docker exec ollama ollama pull deepseek-r1:8b
+          sleep 15
           docker exec -d ollama ollama serve
+          sleep 15
           EOF
 
-      - name: Confirm WebUI is Running
+      - name: Confirm WebUI is Running & Accessible via Custom Domain
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/my-key.pem ubuntu@${{ env.EC2_PUBLIC_IP }} <<EOF
-          curl -I http://localhost:8080
-          EOF
-
-      - name: Confirm Load Balancer is Exposing the WebUI
-        run: |
-          curl -I https://${{ env.LB_DNS }}
-
-      - name: Validate Access via Custom Domain
-        run: |
           curl -I https://deepseek.fozdigitalz.com
+          EOF
 
       - name: Remove GitHub Runner IP from Security Group
         if: always()
