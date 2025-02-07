@@ -13,7 +13,7 @@ resource "aws_security_group" "alb_sg" {
   ingress {
     from_port   = 443
     to_port     = 443
-    protocol    = "tcp"
+    protocol    = "TCP"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -22,6 +22,14 @@ resource "aws_security_group" "alb_sg" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Allow TCP traffic on port 11434 from anywhere
+  ingress {
+    from_port = 11434
+    to_port = 11434
+    protocol = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -56,6 +64,14 @@ resource "aws_security_group" "deepseek_ec2_sg" {
     cidr_blocks = ["${var.my_ip}/32"] # Change to your IP for security
   }
 
+  #Allow tcp traffic on port 11434 from ALN
+  ingress {
+    from_port = 11434
+    to_port = 11434
+    protocol = "TCP"
+    security_groups = [aws_security_group.alb_sg.id]
+  }
+
   # Allow all outbound traffic
   egress {
     from_port   = 0
@@ -76,7 +92,51 @@ resource "aws_lb" "deepseek_lb" {
   enable_deletion_protection = false
 }
 
-# Target Group for ALB
+# Listener for ALB (HTTPS) forwards traffic to the openwebUI
+resource "aws_lb_listener" "https_listener" {
+  load_balancer_arn = aws_lb.deepseek_lb.arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-2016-08"
+  certificate_arn   = var.certificate_arn
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.deepseek_tg.arn
+  }
+}
+
+# HTTP Listener (Port 80) - Redirects to HTTPS
+resource "aws_lb_listener" "http_listener" {
+  load_balancer_arn = aws_lb.deepseek_lb.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type = "redirect"
+
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+}
+
+# Listener for ALB (Ollama API on port 11434)
+resource "aws_lb_listener" "ollama_listener" {
+  load_balancer_arn = aws_lb.deepseek_lb.arn
+  port              = 11434
+  protocol          = "TCP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.ollama_api_tg.arn
+  }
+}
+
+
+# Open_WebUI Target Group for ALB
 resource "aws_lb_target_group" "deepseek_tg" {
   name     = "deepseek-target-group"
   port     = 8080
@@ -91,21 +151,29 @@ resource "aws_lb_target_group" "deepseek_tg" {
     unhealthy_threshold = 2
   }
 }
+# Ollama container Target Group for ALB
+resource "aws_lb_target_group" "ollama_api_tg" {
+  name       = "ollama-api-target-group"
+  port       = 11434
+  protocol   = "TCP"
+  target_type = "instance"
+  vpc_id     = var.vpc_id
 
-# Listener for ALB (HTTPS)
-resource "aws_lb_listener" "https_listener" {
-  load_balancer_arn = aws_lb.deepseek_lb.arn
-  port              = 443
-  protocol          = "HTTPS"
-  ssl_policy        = "ELBSecurityPolicy-2016-08"
-  certificate_arn   = var.certificate_arn
-
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.deepseek_tg.arn
+  health_check {
+    path                = "/"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
   }
 }
 
+# Attach EC2 instance to Target Group
+resource "aws_lb_target_group_attachment" "deepseek_ec2_attachment" {
+  target_group_arn = aws_lb_target_group.deepseek_tg.arn
+  target_id        = aws_instance.deepseek_ec2.id
+  port             = 8080
+}
 
 # IAM Role for EC2
 resource "aws_iam_role" "deepseek_ec2_role" {
@@ -157,12 +225,7 @@ resource "aws_instance" "deepseek_ec2" {
   }
 }
 
-# Attach EC2 instance to Target Group
-resource "aws_lb_target_group_attachment" "deepseek_ec2_attachment" {
-  target_group_arn = aws_lb_target_group.deepseek_tg.arn
-  target_id        = aws_instance.deepseek_ec2.id
-  port             = 8080
-}
+
 
 # Route 53 DNS Record for ALB
 resource "aws_route53_record" "deepseek_dns" {
