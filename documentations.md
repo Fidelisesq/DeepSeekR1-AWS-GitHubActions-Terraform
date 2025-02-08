@@ -572,6 +572,7 @@ The **destroy** job tears down the infrastructure when triggered manually or via
             -backend-config="region=${{ secrets.AWS_DEFAULT_REGION }}"
           terraform destroy -auto-approve -var-file=terraform.tfvars
 ```
+![completed_workflow_run](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/Completed_workflow_run.png)
 
 ---
 ## **5. The Application in Action (Result)**
