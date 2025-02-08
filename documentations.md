@@ -574,7 +574,7 @@ The **destroy** job tears down the infrastructure when triggered manually or via
 ```
 
 ---
-## **7. The Application in Action (Result)**
+## **5. The Application in Action (Result)**
 
 After successfully deploying the DeepSeek Model R1 on AWS, I was able to access the OpenWebUI and interact with the model. Below are some screenshots demonstrating the setup and functionality:
 
@@ -597,13 +597,13 @@ Using the Ollama API, I measured the model’s response time and resource utiliz
 
 - **Average Response Time**: 1.2 seconds
 - **CPU Utilization**: 45%
-- **Memory Usage**: 8 GB
+- **Memory Usage**: 13.65 GB
 
 These metrics were collected using the `nvidia-smi` command (for GPU instances) and CloudWatch metrics.
 
 
 
-## 5. Challenges Faced & Lesson Learned
+## 6. Challenges Faced & Lesson Learned
 
 Deploying the DeepSeek Model R1 on AWS using Terraform and GitHub Actions presented several challenges, each of which taught valuable lessons for improving the deployment process and infrastructure design.
 
@@ -621,7 +621,7 @@ Deploying the DeepSeek Model R1 on AWS using Terraform and GitHub Actions presen
 ---
 
 
-## 6. Future Improvements
+## 7. Future Improvements
 
 While the deployment process is now functional, there are opportunities I may consider to enhance scalability, security, and cost-efficiency.
 
@@ -636,6 +636,6 @@ While the deployment process is now functional, there are opportunities I may co
 
 ---
 
-## 7. Conclusion
+## 8. Conclusion
 
 Deploying the DeepSeek Model R1 on AWS using Terraform and GitHub Actions was a rewarding experience. It not only streamlined the deployment process but also provided a scalable and secure infrastructure. By automating the deployment pipeline, I ensured consistency and repeatability, making it easier to manage and update the infrastructure in the future.
