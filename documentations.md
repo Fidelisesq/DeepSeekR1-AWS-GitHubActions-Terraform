@@ -572,6 +572,7 @@ The **destroy** job tears down the infrastructure when triggered manually or via
             -backend-config="region=${{ secrets.AWS_DEFAULT_REGION }}"
           terraform destroy -auto-approve -var-file=terraform.tfvars
 ```
+`Completed workflow run`
 ![completed_workflow_run](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/Completed_workflow_run.png)
 
 ---
@@ -582,9 +583,9 @@ After successfully deploying the DeepSeek Model R1 on AWS, I was able to access 
 ### **1. OpenWebUI Interface**
 The OpenWebUI provides a user-friendly interface for interacting with the DeepSeek Model R1. Here’s a screenshot of the dashboard:
 
-![OpenWebUI Dashboard](https://example.com/path-to-openwebui-screenshot.png)
+![OpenWebUI Dashboard](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/openwebui-greetingpage.png)
 
-*Caption: The OpenWebUI dashboard, accessible via the custom domain `deepseek.fozdigitalz.com`.*
+*The OpenWebUI dashboard, accessible via the custom domain `deepseek.fozdigitalz.com`.*
 
 ### **2. Model Interaction**
 I tested the model by asking it a few questions. Here’s an example of the model’s response:
