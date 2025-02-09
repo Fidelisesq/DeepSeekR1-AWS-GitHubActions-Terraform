@@ -74,9 +74,6 @@ jobs:
       - name: Mask AWS Account ID in Logs
         run: echo "::add-mask::${{ secrets.AWS_ACCOUNT_ID }}"
 
-      - name: Mask AWS Account ID in Logs
-        run: sed -i "s/${{ secrets.AWS_ACCOUNT_ID }}/REDACTED/g" terraform.log
-
       - name: Terraform Init
         run: |
           terraform init \
@@ -135,9 +132,6 @@ jobs:
 
       - name: Mask AWS Account ID in Logs
         run: echo "::add-mask::${{ secrets.AWS_ACCOUNT_ID }}"
-    
-      - name: Mask AWS Account ID in Logs
-        run: sed -i "s/${{ secrets.AWS_ACCOUNT_ID }}/REDACTED/g" terraform.log
 
       - name: Terraform Init
         run: |
