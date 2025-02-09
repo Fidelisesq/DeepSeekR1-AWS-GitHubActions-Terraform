@@ -4,7 +4,6 @@ Hey there! In this project documentation, I’m going to walk you through how I 
 
 This project involved setting up an EC2 instance, an Application Load Balancer (ALB), security groups, IAM roles, and even a custom domain using Route 53. The best part? Everything was automated, so I didn’t have to manually configure resources every time I made a change. Whether you’re a seasoned DevOps pro or just getting started with cloud deployments, I hope this walkthrough gives you some useful insights (and maybe saves you a few headaches along the way).
 
-
 ---
 
 ## Table of Contents
