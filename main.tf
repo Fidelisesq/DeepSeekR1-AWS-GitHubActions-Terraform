@@ -176,6 +176,7 @@ resource "aws_lb_target_group_attachment" "deepseek_ec2_attachment" {
   port             = 8080
 }
 
+/*
 # IAM Role for EC2
 resource "aws_iam_role" "deepseek_ec2_role" {
   name = "deepseek_ec2_role"
@@ -201,6 +202,7 @@ resource "aws_iam_instance_profile" "deepseek_ec2_profile" {
   name = "deepseek_ec2_profile"
   role = aws_iam_role.deepseek_ec2_role.name
 }
+*/
 
 data "aws_key_pair" "existing_key" {
   key_pair_id = var.key_id
