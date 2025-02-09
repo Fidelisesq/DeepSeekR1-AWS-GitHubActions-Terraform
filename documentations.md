@@ -147,7 +147,7 @@ resource "aws_instance" "deepseek_ec2" {
 
 ### IAM Roles and Instance Profile
 
-An IAM role is created for the EC2 instance, allowing it to assume the role and access necessary AWS resources.
+An IAM role is created for the EC2 instance, allowing it to assume the role and access necessary AWS resources. At first, I wanted to copy the model from an S3 bucket, so I created this EC2 resource. So, I don't need this now because I opted to use a docker image but will keep it for future modifications. 
 
 ```hcl
 resource "aws_iam_role" "deepseek_ec2_role" {
@@ -165,6 +165,12 @@ resource "aws_iam_role" "deepseek_ec2_role" {
       }
     ]
   })
+}
+```
+```hcl
+resource "aws_iam_instance_profile" "deepseek_ec2_profile" {
+  name = "deepseek_ec2_profile"
+  role = aws_iam_role.deepseek_ec2_role.name
 }
 ```
 

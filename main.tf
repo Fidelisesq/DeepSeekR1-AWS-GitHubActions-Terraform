@@ -196,7 +196,6 @@ resource "aws_iam_role" "deepseek_ec2_role" {
 }
 
 
-
 # IAM Instance Profile for EC2
 resource "aws_iam_instance_profile" "deepseek_ec2_profile" {
   name = "deepseek_ec2_profile"
