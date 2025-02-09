@@ -1,4 +1,5 @@
 # Deploying DeepSeek Model R1 on AWS via Terraform & GitHub Actions
+![Architecture Diagram](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/architecture%20diagram.png)
 
 Hey there! In this project documentation, I’m going to walk you through how I deployed the **DeepSeek Model R1** on AWS using **Terraform** and **GitHub Actions**. If you’ve ever tried deploying a machine learning model, you know it can get pretty complicated—especially when you’re juggling multiple AWS services. To make things easier, I decided to automate the whole process using Terraform for infrastructure as code and GitHub Actions for CI/CD. Spoiler alert: it worked like a charm!
 
