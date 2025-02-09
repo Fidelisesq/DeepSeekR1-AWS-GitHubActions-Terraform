@@ -599,7 +599,7 @@ The OpenWebUI provides a user-friendly interface for interacting with the DeepSe
 ### **2. Model Interaction**
 I tested the model by asking it a few questions. Here’s an example of the model’s response:
 
-![Model Response-11]https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/model-response-1.png()
+![Model Response-11](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/model-response-1.png)
 `Sample model response 1` *The DeepSeek Model R1 generating a response to a sample query.*
 
 ![Sample model response-II](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/Model_accespting-response-2.png)
