@@ -176,7 +176,7 @@ resource "aws_iam_instance_profile" "deepseek_ec2_profile" {
 
 ### Route 53 DNS Record
 
-A Route 53 DNS record is created to map the ALB’s DNS name to a custom domain. Like I mentioned above, I used an already exiting certificate to enable SSL and I also employed an exiting hosted zone in us-east-1.
+A Route 53 DNS record is created to map the ALB’s DNS name to a custom domain. Like I mentioned above, I used an already existing certificate to enable SSL and I also employed an existing hosted zone in us-east-1.
 
 ```hcl
 resource "aws_route53_record" "deepseek_dns" {
@@ -276,7 +276,7 @@ variable "my_ip" {
 
 ### Terraform.tfvars
 
-The `terraform.tfvars` file is used to assign values to the variables defined in variables.tf. This file is typically not committed to version control (e.g., Git) for security reasons, as it may contain sensitive information like AWS credentials. I added `terraform.tfvars` to `.gitignore` so it won't be tracked. I provided the variables and secrets in github using `environment variables` and `secrets`. Also, the value below are made up and not real.
+The `terraform.tfvars` file is used to assign values to the variables defined in variables.tf. This file is typically not committed to version control (e.g., Git) for security reasons, as it may contain sensitive information like AWS credentials. I added `terraform.tfvars` to `.gitignore` so it won't be tracked. I provided the variables and secrets in github using `environment variables` and `secrets`. Also, the values below are made up and not real.
 
 ```hcl
 aws_region              = "us-east-1"
@@ -579,7 +579,7 @@ The **destroy** job tears down the infrastructure when triggered manually or via
           terraform destroy -auto-approve -var-file=terraform.tfvars
 ```
 `Completed workflow run`
-![completed_workflow_run](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/Completed_workflow_run.png)
+![completed_workflow_run](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/Completed_workflow_run2.png)
 
 ---
 ## **5. The Application in Action (Result)**
@@ -589,28 +589,44 @@ After successfully deploying the DeepSeek Model R1 on AWS, I was able to access 
 ### **1. OpenWebUI Interface**
 The OpenWebUI provides a user-friendly interface for interacting with the DeepSeek Model R1. Here’s a screenshot of the dashboard:
 
-![OpenWebUI Dashboard](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/openwebui-greetingpage.png)
+![OpenWebUI Dashboard](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/interface-getting%20started.png)
 
 *The OpenWebUI dashboard, accessible via the custom domain `deepseek.fozdigitalz.com`.*
+
+![OpenWebUI Welcome Page](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/openwebui-welcome-page.png)
+`OpenWebUI Welcome Page`
 
 ### **2. Model Interaction**
 I tested the model by asking it a few questions. Here’s an example of the model’s response:
 
-![Model Response](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/Model%20accepting%20responses.png)
+![Model Response-11]https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/model-response-1.png()
+`Sample model response 1` *The DeepSeek Model R1 generating a response to a sample query.*
 
-*The DeepSeek Model R1 generating a response to a sample query.*
+![Sample model response-II](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/Model_accespting-response-2.png)
+`Sample model response 11`
 
-![mModel Response-2](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/Model_accespting-response-2.png)
+![Sample model response 2](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/model-response-2.png)
+`Sample model response 2`
 
-### **3. Performance Metrics**
+![Sample model response 21](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/model-response-22.png)
+
+
+### **3. Infrastructure Clean Up**
+I can destroy my infrastructure when I trigger my workflow in different ways. My workflow will be triggered by pushing to the main branch or manually through the GitHub UI using workflow dispatch with an input to choose the action (apply/destroy).
+- By manually triggering the workflow from the GitHub UI and selecting the `destroy` action.
+- By pushing to the `main` branch with a commit message that contains the word `destroy.`
+- By running the command `gh workflow run "workflow name" --field action=destroy` locally but you must have the Github CLI installed for this to work.
+
+![terraform destroy](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/Terraform%20destroy.png)
+`Infrastructure cleanup using terraform`
+
+### **4. Model Performance Metrics & Instance Metrics**
 Using the Ollama API, I measured the model’s response time and resource utilization. Here’s a summary of the performance:
 
 - **Average Response Time**: 1.2 seconds
 - **CPU Utilization**: 26.8%
 - **Memory Usage**: 13.65 GB
-
-
-
+![CPU Metrics](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/Instance%20Metrics.png)
 
 ## 6. Challenges Faced & Lesson Learned
 
