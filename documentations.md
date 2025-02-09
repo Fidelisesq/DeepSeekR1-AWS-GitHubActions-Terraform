@@ -602,14 +602,14 @@ I tested the model by asking it a few questions. Here’s an example of the mode
 ![Model Response-11](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/model-response-1.png)
 `Sample model response 1` *The DeepSeek Model R1 generating a response to a sample query.*
 
-![Sample model response-II](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/Model_accespting-response-2.png)
+![Sample model response-11](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/Model_accespting-response-2.png)
 `Sample model response 11`
 
-![Sample model response 2](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/model-response-2.png)
-`Sample model response 2`
+![Sample model response 21](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/model-response-2.png)
+`Sample model response 21`
 
-![Sample model response 21](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/model-response-22.png)
-
+![Sample model response 22](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/model-response-22.png)
+`Sample model response 22`
 
 ### **3. Infrastructure Clean Up**
 I can destroy my infrastructure when I trigger my workflow in different ways. My workflow will be triggered by pushing to the main branch or manually through the GitHub UI using workflow dispatch with an input to choose the action (apply/destroy).
