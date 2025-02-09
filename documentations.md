@@ -600,10 +600,9 @@ I tested the model by asking it a few questions. Here’s an example of the mode
 Using the Ollama API, I measured the model’s response time and resource utilization. Here’s a summary of the performance:
 
 - **Average Response Time**: 1.2 seconds
-- **CPU Utilization**: 45%
+- **CPU Utilization**: 34.12%
 - **Memory Usage**: 13.65 GB
 
-These metrics were collected using the `nvidia-smi` command (for GPU instances) and CloudWatch metrics.
 
 
 
