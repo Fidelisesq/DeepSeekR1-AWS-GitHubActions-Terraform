@@ -11,6 +11,9 @@ data "http" "cloudfront_ips" {
 # Parse CloudFront global IPs
 locals {
   cloudfront_global_ips = [for ip in jsondecode(data.http.cloudfront_ips.body)["CLOUDFRONT_GLOBAL_IP_LIST"] : ip]
+  
+  # Break the IPs into chunks of 60 to avoid exceeding the limit
+  cloudfront_ip_chunks = chunklist(local.cloudfront_global_ips, 60)
 }
 
 # Security Group for ALB (Restrict access to CloudFront only)
@@ -28,24 +31,26 @@ resource "aws_security_group" "alb_sg" {
   }
 }
 
-# Allow HTTPS traffic from CloudFront using the CloudFront global IP list
+# Iterate over IP chunks and create multiple security group rules
 resource "aws_security_group_rule" "alb_https_cloudfront" {
+  count                    = length(local.cloudfront_ip_chunks)
   type                     = "ingress"
   from_port                = 443
   to_port                  = 443
   protocol                 = "tcp"
   security_group_id        = aws_security_group.alb_sg.id
-  cidr_blocks              = local.cloudfront_global_ips
+  cidr_blocks              = local.cloudfront_ip_chunks[count.index]
 }
 
 # Allow Ollama API traffic (11434) from CloudFront
 resource "aws_security_group_rule" "alb_ollama_cloudfront" {
+  count                    = length(local.cloudfront_ip_chunks)
   type                     = "ingress"
   from_port                = 11434
   to_port                  = 11434
   protocol                 = "tcp"
   security_group_id        = aws_security_group.alb_sg.id
-  cidr_blocks              = local.cloudfront_global_ips
+  cidr_blocks              = local.cloudfront_ip_chunks[count.index]
 }
 
 # Security Group for EC2 (Only ALB can access it)

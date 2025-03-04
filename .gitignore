@@ -6,3 +6,4 @@ terraform.tfvars
 *.tfstate.*
 .terraform/
 .terraform.lock.hcl
+ip_list.py
