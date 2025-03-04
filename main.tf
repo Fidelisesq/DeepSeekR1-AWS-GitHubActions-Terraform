@@ -5,21 +5,22 @@ provider "aws" {
 
 # Fetch CloudFront IP ranges from the provided URL
 data "http" "cloudfront_ips" {
-  url = "https://d7uri8nf7uskq.cloudfront.net/tools/list-cloudfront-ips"
+  url = "https://ip-ranges.amazonaws.com/ip-ranges.json"
 }
 
 # Parse CloudFront global IPs
 locals {
-  cloudfront_global_ips = [for ip in jsondecode(data.http.cloudfront_ips.body)["CLOUDFRONT_GLOBAL_IP_LIST"] : ip]
+  cloudfront_global_ips = [for ip in jsondecode(data.http.cloudfront_ips.body)["prefixes"] : ip["ip_prefix"] if ip["service"] == "CLOUDFRONT"]
   
-  # Break the IPs into chunks of 60 to avoid exceeding the limit
-  cloudfront_ip_chunks = chunklist(local.cloudfront_global_ips, 60)
+  # Split CloudFront IPs into chunks of 50
+  cloudfront_ip_chunks = chunklist(local.cloudfront_global_ips, 50)
 }
 
-# Security Group for ALB (Restrict access to CloudFront only)
+# Create multiple security groups for CloudFront IPs
 resource "aws_security_group" "alb_sg" {
-  name        = "deepseek_alb_sg"
-  description = "Security group for ALB"
+  count       = length(local.cloudfront_ip_chunks)
+  name        = "deepseek_alb_sg_${count.index}"
+  description = "Security group for ALB (CloudFront IPs chunk ${count.index})"
   vpc_id      = var.vpc_id
 
   # Allow all outbound traffic
@@ -31,25 +32,24 @@ resource "aws_security_group" "alb_sg" {
   }
 }
 
-# Iterate over IP chunks and create multiple security group rules
+# Add ingress rules for each security group
 resource "aws_security_group_rule" "alb_https_cloudfront" {
   count                    = length(local.cloudfront_ip_chunks)
   type                     = "ingress"
   from_port                = 443
   to_port                  = 443
   protocol                 = "tcp"
-  security_group_id        = aws_security_group.alb_sg.id
+  security_group_id        = aws_security_group.alb_sg[count.index].id
   cidr_blocks              = local.cloudfront_ip_chunks[count.index]
 }
 
-# Allow Ollama API traffic (11434) from CloudFront
 resource "aws_security_group_rule" "alb_ollama_cloudfront" {
   count                    = length(local.cloudfront_ip_chunks)
   type                     = "ingress"
   from_port                = 11434
   to_port                  = 11434
   protocol                 = "tcp"
-  security_group_id        = aws_security_group.alb_sg.id
+  security_group_id        = aws_security_group.alb_sg[count.index].id
   cidr_blocks              = local.cloudfront_ip_chunks[count.index]
 }
 
@@ -64,14 +64,14 @@ resource "aws_security_group" "deepseek_ec2_sg" {
     from_port       = 8080
     to_port         = 8080
     protocol        = "tcp"
-    security_groups = [aws_security_group.alb_sg.id]
+    security_groups = aws_security_group.alb_sg[*].id
   }
 
   ingress {
     from_port       = 11434
     to_port         = 11434
     protocol        = "tcp"
-    security_groups = [aws_security_group.alb_sg.id]
+    security_groups = aws_security_group.alb_sg[*].id
   }
 
   # Allow SSH only from your IP
@@ -96,7 +96,7 @@ resource "aws_lb" "deepseek_lb" {
   name               = "deepseek-alb"
   internal           = true
   load_balancer_type = "application"
-  security_groups    = [aws_security_group.alb_sg.id]
+  security_groups    = aws_security_group.alb_sg[*].id
   subnets            = var.private_subnet_ids
 }
 
