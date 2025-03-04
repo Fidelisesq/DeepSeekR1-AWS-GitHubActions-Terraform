@@ -176,32 +176,6 @@ resource "aws_lb_target_group_attachment" "deepseek_ec2_attachment" {
   port             = 8080
 }
 
-/*
-# IAM Role for EC2
-resource "aws_iam_role" "deepseek_ec2_role" {
-  name = "deepseek_ec2_role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "ec2.amazonaws.com"
-        }
-      }
-    ]
-  })
-}
-
-
-# IAM Instance Profile for EC2
-resource "aws_iam_instance_profile" "deepseek_ec2_profile" {
-  name = "deepseek_ec2_profile"
-  role = aws_iam_role.deepseek_ec2_role.name
-}
-*/
 
 data "aws_key_pair" "existing_key" {
   key_pair_id = var.key_id
@@ -226,8 +200,6 @@ resource "aws_instance" "deepseek_ec2" {
     Name = "DeepSeekModelInstance"
   }
 }
-
-
 
 # Route 53 DNS Record for ALB
 resource "aws_route53_record" "deepseek_dns" {
