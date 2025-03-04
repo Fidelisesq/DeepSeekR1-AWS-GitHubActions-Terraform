@@ -1,6 +1,6 @@
 # Provider configuration
 provider "aws" {
-  region = var.region
+  region = "us-east-1"
 }
 
 # Security Group for ALB (Restrict access to CloudFront only)
@@ -9,22 +9,62 @@ resource "aws_security_group" "alb_sg" {
   description = "Security group for ALB"
   vpc_id      = var.vpc_id
 
-  # Allow HTTPS traffic only from CloudFront
+  # Allow all outbound traffic
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# Allow HTTPS traffic from CloudFront using AWS Managed Prefix List
+resource "aws_security_group_rule" "alb_https_cloudfront" {
+  type                     = "ingress"
+  from_port                = 443
+  to_port                  = 443
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.alb_sg.id
+  source_prefix_list_id    = "pl-68a54001" # AWS-managed CloudFront Prefix List
+}
+
+# Allow Ollama API traffic (11434) from CloudFront
+resource "aws_security_group_rule" "alb_ollama_cloudfront" {
+  type                     = "ingress"
+  from_port                = 11434
+  to_port                  = 11434
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.alb_sg.id
+  source_prefix_list_id    = "pl-68a54001"
+}
+
+# Security Group for EC2 (Only ALB can access it)
+resource "aws_security_group" "deepseek_ec2_sg" {
+  name        = "deepseek_ec2_sg"
+  description = "Security group for EC2 instance"
+  vpc_id      = var.vpc_id
+
+  # Allow traffic from ALB on OpenWebUI & Ollama API
   ingress {
-    from_port       = 443
-    to_port         = 443
+    from_port       = 8080
+    to_port         = 8080
     protocol        = "tcp"
-    security_group_id = aws_security_group.alb_sg.id
-    source_prefix_list_id = "pl-68a54001" # AWS-managed CloudFront Prefix List
+    security_groups = [aws_security_group.alb_sg.id]
   }
 
-  # Allow Ollama API traffic from CloudFront
   ingress {
     from_port       = 11434
     to_port         = 11434
     protocol        = "tcp"
-    security_group_id = aws_security_group.alb_sg.id
-    source_prefix_list_id = "pl-68a54001"
+    security_groups = [aws_security_group.alb_sg.id]
+  }
+
+  # Allow SSH only from your IP
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["${var.my_ip}/32"]
   }
 
   # Allow all outbound traffic
@@ -35,6 +75,7 @@ resource "aws_security_group" "alb_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
+
 
 # Security Group for EC2 (Only ALB can access it)
 resource "aws_security_group" "deepseek_ec2_sg" {

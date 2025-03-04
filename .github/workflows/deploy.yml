@@ -270,7 +270,6 @@ jobs:
           public_subnet_id = "${{ secrets.PUBLIC_SUBNET_ID }}"
           terraform_state_bucket = "${{ secrets.TERRAFORM_STATE_BUCKET }}"
           private_subnet_ids = ["$(echo ${{ secrets.PRIVATE_SUBNET_IDS }} | sed 's/,/","/g')"]
-
           EOF
 
       - name: Terraform Init & Destroy
