@@ -38,6 +38,7 @@ resource "aws_security_group_rule" "alb_ollama_cloudfront" {
   source_prefix_list_id    = "pl-68a54001"
 }
 
+/*
 # Security Group for EC2 (Only ALB can access it)
 resource "aws_security_group" "deepseek_ec2_sg" {
   name        = "deepseek_ec2_sg"
@@ -75,7 +76,7 @@ resource "aws_security_group" "deepseek_ec2_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
-
+*/
 
 # Security Group for EC2 (Only ALB can access it)
 resource "aws_security_group" "deepseek_ec2_sg" {
