@@ -70,8 +70,6 @@ jobs:
           public_subnet_id = "${{ secrets.PUBLIC_SUBNET_ID }}"
           terraform_state_bucket = "${{ secrets.TERRAFORM_STATE_BUCKET }}"
           private_subnet_ids = ["$(echo ${{ secrets.PRIVATE_SUBNET_IDS }} | sed 's/,/","/g')"]
-          cloudfront_global_ip_list = "${{ secrets.CLOUDFRONT_GLOBAL_IP_LIST }}"
-          cloudfront_regional_edge_ip_list = "${{ secrets.CLOUDFRONT_REGIONAL_EDGE_IP_LIST }}"
           EOF
 
       - name: Mask AWS Account ID in Logs
@@ -132,8 +130,6 @@ jobs:
             public_subnet_id = "${{ secrets.PUBLIC_SUBNET_ID }}"
             terraform_state_bucket = "${{ secrets.TERRAFORM_STATE_BUCKET }}"
             private_subnet_ids = ["$(echo ${{ secrets.PRIVATE_SUBNET_IDS }} | sed 's/,/","/g')"]
-            cloudfront_global_ip_list = "${{ secrets.CLOUDFRONT_GLOBAL_IP_LIST }}"
-            cloudfront_regional_edge_ip_list = "${{ secrets.CLOUDFRONT_REGIONAL_EDGE_IP_LIST }}"
             EOF
 
       - name: Mask AWS Account ID in Logs
@@ -272,8 +268,6 @@ jobs:
           public_subnet_id = "${{ secrets.PUBLIC_SUBNET_ID }}"
           terraform_state_bucket = "${{ secrets.TERRAFORM_STATE_BUCKET }}"
           private_subnet_ids = ["$(echo ${{ secrets.PRIVATE_SUBNET_IDS }} | sed 's/,/","/g')"]
-          cloudfront_global_ip_list = "${{ secrets.CLOUDFRONT_GLOBAL_IP_LIST }}"
-          cloudfront_regional_edge_ip_list = "${{ secrets.CLOUDFRONT_REGIONAL_EDGE_IP_LIST }}"
           EOF
 
       - name: Terraform Init & Destroy
