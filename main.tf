@@ -18,14 +18,14 @@ resource "aws_security_group" "alb_sg" {
   }
 }
 
-# Allow HTTPS traffic from CloudFront using AWS Managed Prefix List
+# Allow HTTPS traffic from CloudFront using the CloudFront global IP list from terraform.tfvars
 resource "aws_security_group_rule" "alb_https_cloudfront" {
   type                     = "ingress"
   from_port                = 443
   to_port                  = 443
   protocol                 = "tcp"
   security_group_id        = aws_security_group.alb_sg.id
-  source_prefix_list_id    = "pl-68a54001" # AWS-managed CloudFront Prefix List
+  cidr_blocks              = var.cloudfront_global_ip_list
 }
 
 # Allow Ollama API traffic (11434) from CloudFront
@@ -35,48 +35,8 @@ resource "aws_security_group_rule" "alb_ollama_cloudfront" {
   to_port                  = 11434
   protocol                 = "tcp"
   security_group_id        = aws_security_group.alb_sg.id
-  source_prefix_list_id    = "pl-68a54001"
+  cidr_blocks              = var.cloudfront_global_ip_list
 }
-
-/*
-# Security Group for EC2 (Only ALB can access it)
-resource "aws_security_group" "deepseek_ec2_sg" {
-  name        = "deepseek_ec2_sg"
-  description = "Security group for EC2 instance"
-  vpc_id      = var.vpc_id
-
-  # Allow traffic from ALB on OpenWebUI & Ollama API
-  ingress {
-    from_port       = 8080
-    to_port         = 8080
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb_sg.id]
-  }
-
-  ingress {
-    from_port       = 11434
-    to_port         = 11434
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb_sg.id]
-  }
-
-  # Allow SSH only from your IP
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["${var.my_ip}/32"]
-  }
-
-  # Allow all outbound traffic
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-*/
 
 # Security Group for EC2 (Only ALB can access it)
 resource "aws_security_group" "deepseek_ec2_sg" {
@@ -217,9 +177,9 @@ resource "aws_cloudfront_distribution" "deepseek_cloudfront" {
     }
   }
 
-  enabled = true
-  default_root_object = "index.html"
-
+  enabled              = true
+  default_root_object  = "index.html"
+  
   default_cache_behavior {
     target_origin_id       = "deepseek-alb"
     viewer_protocol_policy = "redirect-to-https"
@@ -239,7 +199,14 @@ resource "aws_cloudfront_distribution" "deepseek_cloudfront" {
     acm_certificate_arn = var.certificate_arn
     ssl_support_method  = "sni-only"
   }
+
+  restrictions {
+    geo_restriction {
+      restriction_type = "none"
+    }
+  }
 }
+
 
 # Route 53 DNS Record for CloudFront
 resource "aws_route53_record" "deepseek_dns" {
@@ -253,7 +220,6 @@ resource "aws_route53_record" "deepseek_dns" {
     evaluate_target_health = false
   }
 }
-
 
 # Terraform Backend (S3 for State Management)
 terraform {

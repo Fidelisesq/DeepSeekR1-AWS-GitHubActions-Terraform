@@ -44,3 +44,13 @@ variable "my_ip" {
   description = "Your IP for SSH access (change before deployment)"
   type        = string
 }
+
+variable "cloudfront_global_ip_list" {
+  description = "List of CloudFront Global IP ranges."
+  type        = list(string)
+}
+
+variable "cloudfront_regional_edge_ip_list" {
+  description = "List of CloudFront Regional Edge IP ranges."
+  type        = list(string)
+}
