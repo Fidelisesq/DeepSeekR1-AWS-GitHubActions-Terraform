@@ -45,6 +45,7 @@ variable "my_ip" {
   type        = string
 }
 
+/*
 variable "cloudfront_global_ip_list" {
   description = "List of CloudFront Global IP ranges."
   type        = list(string)
@@ -54,3 +55,4 @@ variable "cloudfront_regional_edge_ip_list" {
   description = "List of CloudFront Regional Edge IP ranges."
   type        = list(string)
 }
+*/

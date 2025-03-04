@@ -3,6 +3,16 @@ provider "aws" {
   region = "us-east-1"
 }
 
+# Fetch CloudFront IP ranges from the provided URL
+data "http" "cloudfront_ips" {
+  url = "https://d7uri8nf7uskq.cloudfront.net/tools/list-cloudfront-ips"
+}
+
+# Parse CloudFront global IPs
+locals {
+  cloudfront_global_ips = [for ip in jsondecode(data.http.cloudfront_ips.body)["CLOUDFRONT_GLOBAL_IP_LIST"] : ip]
+}
+
 # Security Group for ALB (Restrict access to CloudFront only)
 resource "aws_security_group" "alb_sg" {
   name        = "deepseek_alb_sg"
@@ -18,14 +28,14 @@ resource "aws_security_group" "alb_sg" {
   }
 }
 
-# Allow HTTPS traffic from CloudFront using the CloudFront global IP list from terraform.tfvars
+# Allow HTTPS traffic from CloudFront using the CloudFront global IP list
 resource "aws_security_group_rule" "alb_https_cloudfront" {
   type                     = "ingress"
   from_port                = 443
   to_port                  = 443
   protocol                 = "tcp"
   security_group_id        = aws_security_group.alb_sg.id
-  cidr_blocks              = var.cloudfront_global_ip_list
+  cidr_blocks              = local.cloudfront_global_ips
 }
 
 # Allow Ollama API traffic (11434) from CloudFront
@@ -35,7 +45,7 @@ resource "aws_security_group_rule" "alb_ollama_cloudfront" {
   to_port                  = 11434
   protocol                 = "tcp"
   security_group_id        = aws_security_group.alb_sg.id
-  cidr_blocks              = var.cloudfront_global_ip_list
+  cidr_blocks              = local.cloudfront_global_ips
 }
 
 # Security Group for EC2 (Only ALB can access it)
@@ -206,7 +216,6 @@ resource "aws_cloudfront_distribution" "deepseek_cloudfront" {
     }
   }
 }
-
 
 # Route 53 DNS Record for CloudFront
 resource "aws_route53_record" "deepseek_dns" {
