@@ -1,36 +1,30 @@
 # Provider configuration
 provider "aws" {
-  region = "us-east-1"
+  region = var.region
 }
 
-# Security Group for ALB
+# Security Group for ALB (Restrict access to CloudFront only)
 resource "aws_security_group" "alb_sg" {
   name        = "deepseek_alb_sg"
   description = "Security group for ALB"
   vpc_id      = var.vpc_id
 
-  # Allow HTTPS traffic from anywhere
+  # Allow HTTPS traffic only from CloudFront
   ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
+    security_group_id = aws_security_group.alb_sg.id
+    source_prefix_list_id = "pl-68a54001" # AWS-managed CloudFront Prefix List
   }
 
-  # Allow HTTP traffic for testing (optional, remove if not needed)
+  # Allow Ollama API traffic from CloudFront
   ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # Allow TCP traffic on port 11434 from anywhere
-  ingress {
-    from_port = 11434
-    to_port = 11434
-    protocol = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    from_port       = 11434
+    to_port         = 11434
+    protocol        = "tcp"
+    security_group_id = aws_security_group.alb_sg.id
+    source_prefix_list_id = "pl-68a54001"
   }
 
   # Allow all outbound traffic
@@ -42,13 +36,13 @@ resource "aws_security_group" "alb_sg" {
   }
 }
 
-# Security Group for EC2 (only allows traffic from ALB)
+# Security Group for EC2 (Only ALB can access it)
 resource "aws_security_group" "deepseek_ec2_sg" {
   name        = "deepseek_ec2_sg"
   description = "Security group for EC2 instance"
   vpc_id      = var.vpc_id
 
-  # Allow traffic from ALB on port 8080
+  # Allow traffic from ALB on OpenWebUI & Ollama API
   ingress {
     from_port       = 8080
     to_port         = 8080
@@ -56,20 +50,19 @@ resource "aws_security_group" "deepseek_ec2_sg" {
     security_groups = [aws_security_group.alb_sg.id]
   }
 
-  # Allow SSH for administration (optional, restrict CIDR in production)
+  ingress {
+    from_port       = 11434
+    to_port         = 11434
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
+  }
+
+  # Allow SSH only from your IP
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["${var.my_ip}/32"] # Change to your IP for security
-  }
-
-  #Allow tcp traffic on port 11434 from ALB
-  ingress {
-    from_port = 11434
-    to_port = 11434
-    protocol = "tcp"
-    security_groups = [aws_security_group.alb_sg.id]
+    cidr_blocks = ["${var.my_ip}/32"]
   }
 
   # Allow all outbound traffic
@@ -81,18 +74,16 @@ resource "aws_security_group" "deepseek_ec2_sg" {
   }
 }
 
-# Load Balancer (ALB)
+# Internal ALB (Private Subnet)
 resource "aws_lb" "deepseek_lb" {
   name               = "deepseek-alb"
-  internal           = false
+  internal           = true
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb_sg.id]
-  subnets            = var.subnet_ids
-
-  enable_deletion_protection = false
+  subnets            = var.private_subnet_ids
 }
 
-# Listener for ALB (HTTPS) forwards traffic to the openwebUI
+# Listener for ALB (HTTPS) forwards traffic to OpenWebUI
 resource "aws_lb_listener" "https_listener" {
   load_balancer_arn = aws_lb.deepseek_lb.arn
   port              = 443
@@ -106,29 +97,12 @@ resource "aws_lb_listener" "https_listener" {
   }
 }
 
-# HTTP Listener (Port 80) - Redirects to HTTPS
-resource "aws_lb_listener" "http_listener" {
-  load_balancer_arn = aws_lb.deepseek_lb.arn
-  port              = 80
-  protocol          = "HTTP"
-
-  default_action {
-    type = "redirect"
-
-    redirect {
-      port        = "443"
-      protocol    = "HTTPS"
-      status_code = "HTTP_301"
-    }
-  }
-}
-
-# Listener for ALB (Ollama API on port 11434)
+# Listener for Ollama API
 resource "aws_lb_listener" "ollama_listener" {
   load_balancer_arn = aws_lb.deepseek_lb.arn
   port              = 11434
   protocol          = "HTTPS"
-  certificate_arn = var.certificate_arn
+  certificate_arn   = var.certificate_arn
 
   default_action {
     type             = "forward"
@@ -136,8 +110,7 @@ resource "aws_lb_listener" "ollama_listener" {
   }
 }
 
-
-# Open_WebUI Target Group for ALB
+# Target Groups
 resource "aws_lb_target_group" "deepseek_tg" {
   name     = "deepseek-target-group"
   port     = 8080
@@ -152,7 +125,7 @@ resource "aws_lb_target_group" "deepseek_tg" {
     unhealthy_threshold = 2
   }
 }
-# Ollama container Target Group for ALB
+
 resource "aws_lb_target_group" "ollama_api_tg" {
   name       = "ollama-api-target-group"
   port       = 11434
@@ -169,26 +142,13 @@ resource "aws_lb_target_group" "ollama_api_tg" {
   }
 }
 
-# Attach EC2 instance to Target Group
-resource "aws_lb_target_group_attachment" "deepseek_ec2_attachment" {
-  target_group_arn = aws_lb_target_group.deepseek_tg.arn
-  target_id        = aws_instance.deepseek_ec2.id
-  port             = 8080
-}
-
-
-data "aws_key_pair" "existing_key" {
-  key_pair_id = var.key_id
-}
-
-# EC2 Instance with IAM Role and gp3 EBS (48GB)
+# EC2 Instance (Private Subnet)
 resource "aws_instance" "deepseek_ec2" {
   ami             = var.ami_id
   instance_type   = var.instance_type
-  key_name        = data.aws_key_pair.existing_key.key_name
-  subnet_id       = var.public_subnet_id
+  key_name        = var.key_id
+  subnet_id       = var.private_subnet_ids[0]
   security_groups = [aws_security_group.deepseek_ec2_sg.id]
-  #iam_instance_profile = aws_iam_instance_profile.deepseek_ec2_profile.name
 
   root_block_device {
     volume_size           = 48
@@ -201,18 +161,57 @@ resource "aws_instance" "deepseek_ec2" {
   }
 }
 
-# Route 53 DNS Record for ALB
+# CloudFront Distribution
+resource "aws_cloudfront_distribution" "deepseek_cloudfront" {
+  origin {
+    domain_name = aws_lb.deepseek_lb.dns_name
+    origin_id   = "deepseek-alb"
+
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "https-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
+    }
+  }
+
+  enabled = true
+  default_root_object = "index.html"
+
+  default_cache_behavior {
+    target_origin_id       = "deepseek-alb"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
+    cached_methods         = ["GET", "HEAD"]
+    compress               = true
+    forwarded_values {
+      query_string = true
+      headers      = ["Authorization"]
+      cookies {
+        forward = "all"
+      }
+    }
+  }
+
+  viewer_certificate {
+    acm_certificate_arn = var.certificate_arn
+    ssl_support_method  = "sni-only"
+  }
+}
+
+# Route 53 DNS Record for CloudFront
 resource "aws_route53_record" "deepseek_dns" {
   zone_id = var.hosted_zone_id
   name    = "deepseek.fozdigitalz.com"
   type    = "A"
 
   alias {
-    name                   = aws_lb.deepseek_lb.dns_name
-    zone_id                = aws_lb.deepseek_lb.zone_id
-    evaluate_target_health = true
+    name                   = aws_cloudfront_distribution.deepseek_cloudfront.domain_name
+    zone_id                = aws_cloudfront_distribution.deepseek_cloudfront.hosted_zone_id
+    evaluate_target_health = false
   }
 }
+
 
 # Terraform Backend (S3 for State Management)
 terraform {
@@ -223,4 +222,3 @@ terraform {
     encrypt        = true
   }
 }
-
