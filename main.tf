@@ -235,7 +235,7 @@ resource "aws_route53_record" "deepseek_dns" {
   }
 }
 
-# Terraform Backend (S3 for State Management)
+# Terraform Backend (S3 for State Management-)
 terraform {
   backend "s3" {
     bucket         = "foz-terraform-state-bucket"
