@@ -189,7 +189,7 @@ resource "aws_wafv2_web_acl" "deepseek_waf" {
     allow {}
   }
 
-  # AWS Managed Rule: SQL Injection Protection
+  # SQL Injection Protection
   rule {
     name     = "AWS-SQLInjection-Protection"
     priority = 1
@@ -200,7 +200,7 @@ resource "aws_wafv2_web_acl" "deepseek_waf" {
 
     statement {
       managed_rule_group_statement {
-        name        = "AWSManagedRulesSQLiRuleSet"
+        name        = "AWSManagedRulesSQLiRuleSet"  # Ensure the exact rule group name
         vendor_name = "AWS"
       }
     }
@@ -212,7 +212,7 @@ resource "aws_wafv2_web_acl" "deepseek_waf" {
     }
   }
 
-  # AWS Managed Rule: XSS Protection
+  # XSS Protection
   rule {
     name     = "AWS-XSS-Protection"
     priority = 2
@@ -223,7 +223,7 @@ resource "aws_wafv2_web_acl" "deepseek_waf" {
 
     statement {
       managed_rule_group_statement {
-        name        = "AWSManagedRulesXSSRuleSet"
+        name        = "AWSManagedRulesXSSRuleSet"  # Ensure the exact rule group name
         vendor_name = "AWS"
       }
     }
@@ -235,7 +235,7 @@ resource "aws_wafv2_web_acl" "deepseek_waf" {
     }
   }
 
-  # Rate Limiting Rule (Limits requests from a single IP)
+  # Rate Limiting Rule
   rule {
     name     = "RateLimit"
     priority = 3
@@ -246,7 +246,7 @@ resource "aws_wafv2_web_acl" "deepseek_waf" {
 
     statement {
       rate_based_statement {
-        limit              = 200  # Max requests allowed per 5 minutes
+        limit              = 200
         aggregate_key_type = "IP"
       }
     }
@@ -258,7 +258,7 @@ resource "aws_wafv2_web_acl" "deepseek_waf" {
     }
   }
 
-  # AWS Managed Rule: Bot Protection (Blocks known bad bots)
+  # Bot Control Protection
   rule {
     name     = "AWS-Bot-Control"
     priority = 4
@@ -269,7 +269,7 @@ resource "aws_wafv2_web_acl" "deepseek_waf" {
 
     statement {
       managed_rule_group_statement {
-        name        = "AWSManagedRulesBotControlRuleSet"
+        name        = "AWSManagedRulesBotControlRuleSet"  # Ensure the exact rule group name
         vendor_name = "AWS"
       }
     }
@@ -287,6 +287,7 @@ resource "aws_wafv2_web_acl" "deepseek_waf" {
     sampled_requests_enabled   = true
   }
 }
+
 
 
 #WAF Attachement to ALB
