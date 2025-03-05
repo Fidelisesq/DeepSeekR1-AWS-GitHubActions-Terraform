@@ -144,9 +144,8 @@ resource "aws_lb_target_group" "ollama_api_tg" {
 }
 
 data "aws_key_pair" "existing_key" {
-  key_pair_id = "var.key_id"
+  key_pair_id = var.key_id
 }
-
 
 # EC2 Instance (Private Subnet)
 resource "aws_instance" "deepseek_ec2" {
