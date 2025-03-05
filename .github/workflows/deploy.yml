@@ -137,6 +137,8 @@ jobs:
           aws ssm describe-instance-information --region ${{ secrets.AWS_DEFAULT_REGION }} \
             --query "InstanceInformationList[?InstanceId=='${{ env.EC2_INSTANCE_ID }}']" \
             --output json
+        env:
+          TF_LOG: DEBUG
 
       - name: Check SSM Agent Status
         run: |
@@ -146,7 +148,7 @@ jobs:
             --parameters '{"commands":["sudo systemctl status amazon-ssm-agent"]}' \
             --region ${{ secrets.AWS_DEFAULT_REGION }}    
         env:
-          TF_LOG: true      
+          TF_LOG: DEBUG     
 
       - name: Install Docker via SSM
         run: |
@@ -156,7 +158,7 @@ jobs:
             --parameters '{"commands":["sudo apt-get update","sudo apt-get install -y docker.io docker-compose","sudo systemctl enable docker","sudo systemctl start docker","sudo usermod -aG docker ubuntu"]}' \
             --region ${{ secrets.AWS_DEFAULT_REGION }}
         env:
-          TF_LOG: true
+          TF_LOG: DEBUG
 
       - name: Deploy DeepSeek Model via SSM
         run: |
