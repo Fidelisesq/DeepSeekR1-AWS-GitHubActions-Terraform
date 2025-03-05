@@ -84,8 +84,8 @@ jobs:
 
       - name: Terraform Plan
         run: terraform plan -out=tfplan -var-file=terraform.tfvars
-        #env:
-          #TF_LOG: DEBUG
+        env:
+          TF_LOG: DEBUG
 
       - name: Terraform Apply
         run: terraform apply -auto-approve -var-file=terraform.tfvars
