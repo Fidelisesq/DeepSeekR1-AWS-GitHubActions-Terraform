@@ -42,3 +42,8 @@ variable "my_ip" {
   description = "Your IP address to allow SSH access"
   type        = string
 }
+
+variable "key_name" {
+  description = "SSH key"
+  type        = string
+}

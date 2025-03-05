@@ -58,7 +58,6 @@ jobs:
           ami_id = "${{ secrets.AMI_ID }}"
           certificate_arn = "${{ secrets.CERTIFICATE_ARN }}"
           vpc_id = "${{ secrets.VPC_ID }}"
-          subnet_ids = ["${{ secrets.SUBNET_IDS }}"]
           key_name = "${{ secrets.KEY_NAME }}"
           key_id = "${{ secrets.KEY_ID }}"
           hosted_zone_id = "${{ secrets.HOSTED_ZONE_ID }}"
@@ -117,7 +116,6 @@ jobs:
             ami_id = "${{ secrets.AMI_ID }}"
             certificate_arn = "${{ secrets.CERTIFICATE_ARN }}"
             vpc_id = "${{ secrets.VPC_ID }}"
-            subnet_ids = ["${{ secrets.SUBNET_IDS }}"]
             key_name = "${{ secrets.KEY_NAME }}"
             key_id = "${{ secrets.KEY_ID }}"
             hosted_zone_id = "${{ secrets.HOSTED_ZONE_ID }}"
@@ -254,7 +252,6 @@ jobs:
           ami_id = "${{ secrets.AMI_ID }}"
           certificate_arn = "${{ secrets.CERTIFICATE_ARN }}"
           vpc_id = "${{ secrets.VPC_ID }}"
-          subnet_ids = ["${{ secrets.SUBNET_IDS }}"]
           key_name = "${{ secrets.KEY_NAME }}"
           key_id = "${{ secrets.KEY_ID }}"
           hosted_zone_id = "${{ secrets.HOSTED_ZONE_ID }}"
