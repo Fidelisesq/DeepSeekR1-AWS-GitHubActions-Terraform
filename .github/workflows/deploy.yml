@@ -66,8 +66,8 @@ jobs:
           aws_access_key_id = "${{ secrets.AWS_ACCESS_KEY_ID }}"
           aws_secret_access_key = "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
           aws_region = "${{ secrets.AWS_DEFAULT_REGION }}"
-          public_subnet_ids = ["${{ secrets.PUBLIC_SUBNET_IDS }}"]
-          private_subnet_ids = ["${{ secrets.PRIVATE_SUBNET_IDS }}"]
+          public_subnet_ids = ${{ secrets.PUBLIC_SUBNET_IDS }}
+          private_subnet_ids = ${{ secrets.PRIVATE_SUBNET_IDS }}
           EOF
 
       - name: Mask AWS Account ID in Logs
@@ -124,8 +124,8 @@ jobs:
             aws_access_key_id = "${{ secrets.AWS_ACCESS_KEY_ID }}"
             aws_secret_access_key = "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
             aws_region = "${{ secrets.AWS_DEFAULT_REGION }}"
-            public_subnet_ids = ["${{ secrets.PUBLIC_SUBNET_IDS }}"]
-            private_subnet_ids = ["${{ secrets.PRIVATE_SUBNET_IDS }}"]
+            public_subnet_ids = ${{ secrets.PUBLIC_SUBNET_IDS }}
+            private_subnet_ids = ${{ secrets.PRIVATE_SUBNET_IDS }}
             EOF
 
       - name: Mask AWS Account ID in Logs
@@ -260,8 +260,8 @@ jobs:
           aws_access_key_id = "${{ secrets.AWS_ACCESS_KEY_ID }}"
           aws_secret_access_key = "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
           aws_region = "${{ secrets.AWS_DEFAULT_REGION }}"
-          public_subnet_ids = ["${{ secrets.PUBLIC_SUBNET_IDS }}"]
-          private_subnet_ids = ["${{ secrets.PRIVATE_SUBNET_IDS }}"]
+          public_subnet_ids = ${{ secrets.PUBLIC_SUBNET_IDS }}
+          private_subnet_ids = ${{ secrets.PRIVATE_SUBNET_IDS }}
           EOF
 
       - name: Terraform Init & Destroy
