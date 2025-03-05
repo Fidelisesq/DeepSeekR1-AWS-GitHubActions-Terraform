@@ -3,6 +3,10 @@ provider "aws" {
   region = "us-east-1"
 }
 
+# Declare the caller identity data resource
+data "aws_caller_identity" "current" {}
+
+
 # Security Group for ALB (Allows direct access)
 resource "aws_security_group" "alb_sg" {
   name        = "deepseek_alb_sg"
@@ -143,7 +147,7 @@ resource "aws_lb_target_group" "ollama_api_tg" {
 resource "aws_instance" "deepseek_ec2" {
   ami             = var.ami_id
   instance_type   = var.instance_type
-  key_name        = var.key_id
+  key_name        = data.aws_key_pair.existing_key.key_name
   subnet_id       = var.private_subnet_ids[0]
   security_groups = [aws_security_group.deepseek_ec2_sg.id]
 
