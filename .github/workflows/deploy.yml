@@ -118,11 +118,12 @@ jobs:
             --query "InstanceInformationList[?InstanceId=='${{ env.EC2_INSTANCE_ID }}']" \
             --output json
               
+
       - name: Install Docker via SSM
         run: |
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
-            --targets '[{"Key":"instanceIds","Values":["${{ env.EC2_INSTANCE_ID }}"]}]' \
+            --targets '[{"Key":"InstanceIds","Values":["${{ env.EC2_INSTANCE_ID }}"]}]' \
             --parameters '{"commands":["sudo apt-get update","sudo apt-get install -y docker.io docker-compose","sudo systemctl enable docker","sudo systemctl start docker","sudo usermod -aG docker ubuntu"]}' \
             --region ${{ secrets.AWS_DEFAULT_REGION }}
 
