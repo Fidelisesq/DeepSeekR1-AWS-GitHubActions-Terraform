@@ -148,7 +148,7 @@ data "aws_key_pair" "existing_key" {
 }
 
 data "aws_subnet" "subnet_azs" {
-  count = lenght(var.private_subnet_ids)
+  count = length(var.private_subnet_ids)
   id = var.private_subnet_ids[count.index]
 }
 
