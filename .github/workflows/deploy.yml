@@ -102,14 +102,14 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
-
+    
       - name: Verify SSM Connection
         run: |
-          aws ssm send-command \
-            --document-name "AWS-RunShellScript" \
-            --targets '[{"Key":"InstanceIds","Values":["${{ env.EC2_INSTANCE_ID }}"]}]' \
-            --parameters '{"commands":["echo SSM connection successful"]}' \
-            --region ${{ secrets.AWS_DEFAULT_REGION }}
+          echo "Verifying SSM Connection..."
+          aws ssm describe-instance-information --region ${{ secrets.AWS_DEFAULT_REGION }} \
+            --query "InstanceInformationList[?InstanceId=='${{ env.EC2_INSTANCE_ID }}']" \
+            --output json
+              
 
       - name: Install Docker via SSM
         run: |
