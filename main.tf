@@ -152,13 +152,41 @@ data "aws_subnet" "chosen_subnet" {
 }
 
 
-# EC2 Instance (Private Subnet)
+# Create an IAM Role for SSM
+resource "aws_iam_role" "ssm_role" {
+  name = "EC2SSMRole"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Service = "ec2.amazonaws.com"
+      }
+      Action = "sts:AssumeRole"
+    }]
+  })
+}
+
+# Attach the AmazonSSMManagedInstanceCore policy
+resource "aws_iam_role_policy_attachment" "ssm_policy" {
+  role       = aws_iam_role.ssm_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+# Attach the IAM role to the EC2 instance
+resource "aws_iam_instance_profile" "ssm_instance_profile" {
+  name = "EC2SSMInstanceProfile"
+  role = aws_iam_role.ssm_role.name
+}
+
+# Attach the IAM profile to the EC2 instance
 resource "aws_instance" "deepseek_ec2" {
-  ami             = var.ami_id
-  instance_type   = var.instance_type
-  key_name        = data.aws_key_pair.existing_key.key_name
-  subnet_id       = data.aws_subnet.chosen_subnet.id
-  security_groups = [aws_security_group.deepseek_ec2_sg.id]
+  ami                  = var.ami_id
+  instance_type        = var.instance_type
+  subnet_id            = data.aws_subnet.chosen_subnet.id
+  security_groups      = [aws_security_group.deepseek_ec2_sg.id]
+  iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.name
 
   root_block_device {
     volume_size           = 48
@@ -170,6 +198,7 @@ resource "aws_instance" "deepseek_ec2" {
     Name = "DeepSeekModelInstance"
   }
 }
+
 
 # Route 53 DNS Record to point to ALB
 resource "aws_route53_record" "deepseek_dns" {
