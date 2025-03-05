@@ -85,6 +85,13 @@ jobs:
           EC2_ID=$(terraform output -raw deepseek_ec2_id)
           echo "EC2_INSTANCE_ID=$EC2_ID" >> $GITHUB_ENV
 
+
+      - name: Verify EC2 Instance ID
+        run: |
+            echo "EC2_INSTANCE_ID=${{ env.EC2_INSTANCE_ID }}"
+            if [ -z "${{ env.EC2_INSTANCE_ID }}" ]; then exit 1; fi
+        
+
   post_apply:
     runs-on: ubuntu-latest
     needs: apply
@@ -115,19 +122,20 @@ jobs:
         run: |
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
-            --targets "Key=instanceIds,Values=${{ env.EC2_INSTANCE_ID }}" \
+            --targets "Key=instanceIds,Values=${{ env.EC2_INSTANCE_ID }}"
             --parameters '{"commands":["sudo apt-get update","sudo apt-get install -y docker.io docker-compose","sudo systemctl enable docker","sudo systemctl start docker","sudo usermod -aG docker ubuntu"]}' \
             --region ${{ secrets.AWS_DEFAULT_REGION }}
 
 
-
       - name: Deploy DeepSeek Model via SSM
         run: |
-          aws ssm send-command \
-            --document-name "AWS-RunShellScript" \
-            --targets '[{"Key":"InstanceIds","Values":["${{ env.EC2_INSTANCE_ID }}"]}]' \
-            --parameters '{"commands":["docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama","sleep 20","docker exec ollama ollama pull deepseek-r1:8b","sleep 15","docker exec -d ollama ollama serve","sleep 15","docker run -d -p 8080:8080 --add-host=host.docker.internal:host-gateway -v open-webui:/app/backend/data --name open-webui --restart always ghcr.io/open-webui/open-webui:main"]}' \
-            --region ${{ secrets.AWS_DEFAULT_REGION }}
+            echo "Deploying to EC2 instance: ${{ env.EC2_INSTANCE_ID }}"
+            aws ssm send-command \
+              --document-name "AWS-RunShellScript" \
+              --targets "Key=instanceIds,Values=${{ env.EC2_INSTANCE_ID }}" \
+              --parameters '{"commands":["docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama","sleep 20","docker exec ollama ollama pull deepseek-r1:8b","sleep 15","docker exec -d ollama ollama serve","sleep 15","docker run -d -p 8080:8080 --add-host=host.docker.internal:host-gateway -v open-webui:/app/backend/data --name open-webui --restart always ghcr.io/open-webui/open-webui:main"]}' \
+              --region ${{ secrets.AWS_DEFAULT_REGION }}
+          
 
       - name: Confirm WebUI is Running
         run: |
