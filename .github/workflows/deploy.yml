@@ -58,7 +58,9 @@ jobs:
           ami_id = "${{ secrets.AMI_ID }}"
           certificate_arn = "${{ secrets.CERTIFICATE_ARN }}"
           vpc_id = "${{ secrets.VPC_ID }}"
-          subnet_ids = [${{ secrets.SUBNET_IDS }}]
+          subnet_ids = ${{ 
+            secrets.SUBNET_IDS
+             }}
           key_name = "${{ secrets.KEY_NAME }}"
           key_id = "${{ secrets.KEY_ID }}"
           hosted_zone_id = "${{ secrets.HOSTED_ZONE_ID }}"
@@ -67,8 +69,12 @@ jobs:
           aws_access_key_id = "${{ secrets.AWS_ACCESS_KEY_ID }}"
           aws_secret_access_key = "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
           aws_region = "${{ secrets.AWS_DEFAULT_REGION }}"
-          public_subnet_ids = [${{ secrets.PUBLIC_SUBNET_IDS }}]
-          private_subnet_ids = [${{ secrets.PRIVATE_SUBNET_IDS }}]
+          public_subnet_ids = ${{ 
+            secrets.PUBLIC_SUBNET_IDS 
+            }}
+          private_subnet_ids = ${{ 
+            secrets.PRIVATE_SUBNET_IDS 
+            }}
           EOF
 
       - name: Mask AWS Account ID in Logs
