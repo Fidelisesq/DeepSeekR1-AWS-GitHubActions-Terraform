@@ -158,7 +158,7 @@ resource "aws_instance" "deepseek_ec2" {
   ami             = var.ami_id
   instance_type   = var.instance_type
   key_name        = data.aws_key_pair.existing_key.key_name
-  subnet_id       = data.aws_subnet.subnet_azs[0].id
+  subnet_id       = data.aws_subnet.subnet_azs[count.index].id #Select the AZ ddynamically
   security_groups = [aws_security_group.deepseek_ec2_sg.id]
 
   root_block_device {
