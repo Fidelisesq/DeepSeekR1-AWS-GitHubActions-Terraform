@@ -189,10 +189,33 @@ resource "aws_wafv2_web_acl" "deepseek_waf" {
     allow {}
   }
 
+  # Rate Limiting Rule
+  rule {
+    name     = "RateLimitRule"
+    priority = 1
+
+    action {
+      block {}
+    }
+
+    statement {
+      rate_based_statement {
+        limit              = 200
+        aggregate_key_type = "IP"
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "RateLimit"
+      sampled_requests_enabled   = true
+    }
+  }
+/*
   # SQL Injection Protection
   rule {
     name     = "AWS-SQLInjection-Protection"
-    priority = 1
+    priority = 2
 
     action {
       block {}
@@ -215,7 +238,7 @@ resource "aws_wafv2_web_acl" "deepseek_waf" {
   # XSS Protection
   rule {
     name     = "AWS-XSS-Protection"
-    priority = 2
+    priority = 3
 
     action {
       block {}
@@ -234,30 +257,11 @@ resource "aws_wafv2_web_acl" "deepseek_waf" {
       sampled_requests_enabled   = true
     }
   }
+  */
 
-  # Rate Limiting Rule
-  rule {
-    name     = "RateLimit"
-    priority = 3
+  
 
-    action {
-      block {}
-    }
-
-    statement {
-      rate_based_statement {
-        limit              = 200
-        aggregate_key_type = "IP"
-      }
-    }
-
-    visibility_config {
-      cloudwatch_metrics_enabled = true
-      metric_name                = "RateLimit"
-      sampled_requests_enabled   = true
-    }
-  }
-
+/*
   # Bot Control Protection
   rule {
     name     = "AWS-Bot-Control"
@@ -281,6 +285,7 @@ resource "aws_wafv2_web_acl" "deepseek_waf" {
     }
   }
 
+*/
   visibility_config {
     cloudwatch_metrics_enabled = true
     metric_name                = "deepseek-waf"
