@@ -1,16 +1,15 @@
-variable "region" {
-  description = "AWS region"
-  type        = string
-  default     = "us-east-1"
-}
-
 variable "vpc_id" {
   description = "The VPC ID where resources will be deployed"
   type        = string
 }
 
+variable "public_subnet_ids" {
+  description = "List of public subnet IDs for ALB"
+  type        = list(string)
+}
+
 variable "private_subnet_ids" {
-  description = "List of private subnet IDs where ALB and EC2 will be deployed"
+  description = "List of private subnet IDs for EC2 instances"
   type        = list(string)
 }
 
@@ -20,39 +19,26 @@ variable "ami_id" {
 }
 
 variable "instance_type" {
-  description = "EC2 instance type"
+  description = "Instance type for the EC2 instance"
   type        = string
-  default     = "P4d" # Change based on GPU needs
 }
 
 variable "key_id" {
-  description = "AWS Key Pair ID for SSH access"
+  description = "Key pair name for SSH access"
   type        = string
 }
 
 variable "certificate_arn" {
-  description = "ACM certificate ARN for SSL/TLS"
+  description = "ARN of the SSL certificate for HTTPS"
   type        = string
 }
 
 variable "hosted_zone_id" {
-  description = "Route 53 hosted zone ID for DNS records"
+  description = "Route 53 hosted zone ID for the domain"
   type        = string
 }
 
 variable "my_ip" {
-  description = "Your IP for SSH access (change before deployment)"
+  description = "Your IP address to allow SSH access"
   type        = string
 }
-
-/*
-variable "cloudfront_global_ip_list" {
-  description = "List of CloudFront Global IP ranges."
-  type        = list(string)
-}
-
-variable "cloudfront_regional_edge_ip_list" {
-  description = "List of CloudFront Regional Edge IP ranges."
-  type        = list(string)
-}
-*/

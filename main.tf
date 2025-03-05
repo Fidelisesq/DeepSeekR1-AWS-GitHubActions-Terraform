@@ -3,25 +3,26 @@ provider "aws" {
   region = "us-east-1"
 }
 
-# Fetch CloudFront IP ranges from the provided URL
-data "http" "cloudfront_ips" {
-  url = "https://ip-ranges.amazonaws.com/ip-ranges.json"
-}
-
-# Parse CloudFront global IPs
-locals {
-  cloudfront_global_ips = [for ip in jsondecode(data.http.cloudfront_ips.body)["prefixes"] : ip["ip_prefix"] if ip["service"] == "CLOUDFRONT"]
-  
-  # Split CloudFront IPs into chunks of 50
-  cloudfront_ip_chunks = chunklist(local.cloudfront_global_ips, 50)
-}
-
-# Create multiple security groups for CloudFront IPs
+# Security Group for ALB (Allows direct access)
 resource "aws_security_group" "alb_sg" {
-  count       = length(local.cloudfront_ip_chunks)
-  name        = "deepseek_alb_sg_${count.index}"
-  description = "Security group for ALB (CloudFront IPs chunk ${count.index})"
+  name        = "deepseek_alb_sg"
+  description = "Security group for ALB"
   vpc_id      = var.vpc_id
+
+  # Allow HTTPS and Ollama API access from anywhere (or restrict it to your needs)
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]  # Adjust if needed
+  }
+
+  ingress {
+    from_port   = 11434
+    to_port     = 11434
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]  # Adjust if needed
+  }
 
   # Allow all outbound traffic
   egress {
@@ -30,27 +31,6 @@ resource "aws_security_group" "alb_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
-}
-
-# Add ingress rules for each security group
-resource "aws_security_group_rule" "alb_https_cloudfront" {
-  count                    = length(local.cloudfront_ip_chunks)
-  type                     = "ingress"
-  from_port                = 443
-  to_port                  = 443
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.alb_sg[count.index].id
-  cidr_blocks              = local.cloudfront_ip_chunks[count.index]
-}
-
-resource "aws_security_group_rule" "alb_ollama_cloudfront" {
-  count                    = length(local.cloudfront_ip_chunks)
-  type                     = "ingress"
-  from_port                = 11434
-  to_port                  = 11434
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.alb_sg[count.index].id
-  cidr_blocks              = local.cloudfront_ip_chunks[count.index]
 }
 
 # Security Group for EC2 (Only ALB can access it)
@@ -64,14 +44,14 @@ resource "aws_security_group" "deepseek_ec2_sg" {
     from_port       = 8080
     to_port         = 8080
     protocol        = "tcp"
-    security_groups = aws_security_group.alb_sg[*].id
+    security_groups = [aws_security_group.alb_sg.id]
   }
 
   ingress {
     from_port       = 11434
     to_port         = 11434
     protocol        = "tcp"
-    security_groups = aws_security_group.alb_sg[*].id
+    security_groups = [aws_security_group.alb_sg.id]
   }
 
   # Allow SSH only from your IP
@@ -91,13 +71,13 @@ resource "aws_security_group" "deepseek_ec2_sg" {
   }
 }
 
-# Internal ALB (Private Subnet)
+# Application Load Balancer (Public Subnet)
 resource "aws_lb" "deepseek_lb" {
   name               = "deepseek-alb"
-  internal           = true
+  internal           = false   # Public ALB
   load_balancer_type = "application"
-  security_groups    = aws_security_group.alb_sg[*].id
-  subnets            = var.private_subnet_ids
+  security_groups    = [aws_security_group.alb_sg.id]
+  subnets            = var.public_subnet_ids  # ALB must be in public subnets
 }
 
 # Listener for ALB (HTTPS) forwards traffic to OpenWebUI
@@ -144,11 +124,11 @@ resource "aws_lb_target_group" "deepseek_tg" {
 }
 
 resource "aws_lb_target_group" "ollama_api_tg" {
-  name       = "ollama-api-target-group"
-  port       = 11434
-  protocol   = "HTTP"
+  name        = "ollama-api-target-group"
+  port        = 11434
+  protocol    = "HTTP"
   target_type = "instance"
-  vpc_id     = var.vpc_id
+  vpc_id      = var.vpc_id
 
   health_check {
     path                = "/"
@@ -178,64 +158,140 @@ resource "aws_instance" "deepseek_ec2" {
   }
 }
 
-# CloudFront Distribution
-resource "aws_cloudfront_distribution" "deepseek_cloudfront" {
-  origin {
-    domain_name = aws_lb.deepseek_lb.dns_name
-    origin_id   = "deepseek-alb"
-
-    custom_origin_config {
-      http_port              = 80
-      https_port             = 443
-      origin_protocol_policy = "https-only"
-      origin_ssl_protocols   = ["TLSv1.2"]
-    }
-  }
-
-  enabled              = true
-  default_root_object  = "index.html"
-  
-  default_cache_behavior {
-    target_origin_id       = "deepseek-alb"
-    viewer_protocol_policy = "redirect-to-https"
-    allowed_methods        = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
-    cached_methods         = ["GET", "HEAD"]
-    compress               = true
-    forwarded_values {
-      query_string = true
-      headers      = ["Authorization"]
-      cookies {
-        forward = "all"
-      }
-    }
-  }
-
-  viewer_certificate {
-    acm_certificate_arn = var.certificate_arn
-    ssl_support_method  = "sni-only"
-  }
-
-  restrictions {
-    geo_restriction {
-      restriction_type = "none"
-    }
-  }
-}
-
-# Route 53 DNS Record for CloudFront
+# Route 53 DNS Record to point to ALB
 resource "aws_route53_record" "deepseek_dns" {
   zone_id = var.hosted_zone_id
   name    = "deepseek.fozdigitalz.com"
   type    = "A"
 
   alias {
-    name                   = aws_cloudfront_distribution.deepseek_cloudfront.domain_name
-    zone_id                = aws_cloudfront_distribution.deepseek_cloudfront.hosted_zone_id
+    name                   = aws_lb.deepseek_lb.dns_name
+    zone_id                = aws_lb.deepseek_lb.zone_id
     evaluate_target_health = false
   }
 }
 
-# Terraform Backend (S3 for State Management-)
+#AWS Web Application Firewall
+resource "aws_wafv2_web_acl" "deepseek_waf" {
+  name        = "deepseek-waf"
+  description = "WAF for ALB protecting backend"
+  scope       = "REGIONAL"
+
+  default_action {
+    allow {}
+  }
+
+  # AWS Managed Rule: SQL Injection Protection
+  rule {
+    name     = "AWS-SQLInjection-Protection"
+    priority = 1
+
+    action {
+      block {}
+    }
+
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesSQLiRuleSet"
+        vendor_name = "AWS"
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "SQLInjectionProtection"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  # AWS Managed Rule: XSS Protection
+  rule {
+    name     = "AWS-XSS-Protection"
+    priority = 2
+
+    action {
+      block {}
+    }
+
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesXSSRuleSet"
+        vendor_name = "AWS"
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "XSSProtection"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  # Rate Limiting Rule (Limits requests from a single IP)
+  rule {
+    name     = "RateLimit"
+    priority = 3
+
+    action {
+      block {}
+    }
+
+    statement {
+      rate_based_statement {
+        limit              = 200  # Max requests allowed per 5 minutes
+        aggregate_key_type = "IP"
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "RateLimit"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  # AWS Managed Rule: Bot Protection (Blocks known bad bots)
+  rule {
+    name     = "AWS-Bot-Control"
+    priority = 4
+
+    action {
+      block {}
+    }
+
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesBotControlRuleSet"
+        vendor_name = "AWS"
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "BotProtection"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "deepseek-waf"
+    sampled_requests_enabled   = true
+  }
+}
+
+
+#WAF Attachement to ALB
+resource "aws_wafv2_web_acl_association" "deepseek_waf_alb" {
+  resource_arn = aws_lb.deepseek_lb.arn
+  web_acl_arn  = aws_wafv2_web_acl.deepseek_waf.arn
+  depends_on = [aws_lb.deepseek_lb,
+  aws_wafv2_web_acl.deepseek_waf
+  ]
+}
+
+
+# Terraform Backend (S3 for State Management)
 terraform {
   backend "s3" {
     bucket         = "foz-terraform-state-bucket"
