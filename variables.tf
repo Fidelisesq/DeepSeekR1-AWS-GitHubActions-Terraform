@@ -39,7 +39,7 @@ variable "hosted_zone_id" {
 }
 
 variable "my_ip" {
-  description = "Your IP address to allow SSH access"
+  description = "Limited to your Your IP"
   type        = string
 }
 
