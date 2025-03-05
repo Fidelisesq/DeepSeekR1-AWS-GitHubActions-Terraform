@@ -67,7 +67,7 @@ jobs:
           aws_access_key_id = "${{ secrets.AWS_ACCESS_KEY_ID }}"
           aws_secret_access_key = "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
           aws_region = "${{ secrets.AWS_DEFAULT_REGION }}"
-          public_subnet_id = "${{ secrets.PUBLIC_SUBNET_ID }}"
+          public_subnet_ids = "${{ secrets.PUBLIC_SUBNET_IDS }}"
           terraform_state_bucket = "${{ secrets.TERRAFORM_STATE_BUCKET }}"
           private_subnet_ids = ["$(echo ${{ secrets.PRIVATE_SUBNET_IDS }} | sed 's/,/","/g')"]
           EOF
@@ -127,7 +127,7 @@ jobs:
             aws_access_key_id = "${{ secrets.AWS_ACCESS_KEY_ID }}"
             aws_secret_access_key = "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
             aws_region = "${{ secrets.AWS_DEFAULT_REGION }}"
-            public_subnet_id = "${{ secrets.PUBLIC_SUBNET_ID }}"
+            public_subnet_ids = "${{ secrets.PUBLIC_SUBNET_IDS }}"
             terraform_state_bucket = "${{ secrets.TERRAFORM_STATE_BUCKET }}"
             private_subnet_ids = ["$(echo ${{ secrets.PRIVATE_SUBNET_IDS }} | sed 's/,/","/g')"]
             EOF
@@ -265,7 +265,7 @@ jobs:
           aws_access_key_id = "${{ secrets.AWS_ACCESS_KEY_ID }}"
           aws_secret_access_key = "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
           aws_region = "${{ secrets.AWS_DEFAULT_REGION }}"
-          public_subnet_id = "${{ secrets.PUBLIC_SUBNET_ID }}"
+          public_subnet_ids = "${{ secrets.PUBLIC_SUBNET_IDS }}"
           terraform_state_bucket = "${{ secrets.TERRAFORM_STATE_BUCKET }}"
           private_subnet_ids = ["$(echo ${{ secrets.PRIVATE_SUBNET_IDS }} | sed 's/,/","/g')"]
           EOF
