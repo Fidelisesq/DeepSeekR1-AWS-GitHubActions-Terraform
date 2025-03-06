@@ -10,18 +10,11 @@ data "aws_vpc" "main_vpc" {
   id = var.vpc_id
 }
 
-# Enable DNS support and hostnames for the VPC
-resource "aws_vpc" "main_vpc" {
-  id                     = var.vpc_id
-  enable_dns_support      = true
-  enable_dns_hostnames    = true
-}
-
 # Security Group for VPC Endpoints
 resource "aws_security_group" "endpoint_sg" {
   name        = "vpc-endpoint-sg"
   description = "Security group for VPC Endpoints"
-  vpc_id      = var.vpc_id
+  vpc_id      = data.aws_vpc.main_vpc.id
 
   # Allow traffic from EC2 to VPC Endpoints
   ingress {
@@ -51,7 +44,7 @@ resource "aws_security_group" "endpoint_sg" {
 resource "aws_security_group" "alb_sg" {
   name        = "deepseek_alb_sg"
   description = "Security group for ALB"
-  vpc_id      = var.vpc_id
+  vpc_id      = data.aws_vpc.main_vpc.id
 
   # Allow HTTPS and Ollama API access from anywhere (or restrict it to your needs)
   ingress {
@@ -81,7 +74,7 @@ resource "aws_security_group" "alb_sg" {
 resource "aws_security_group" "deepseek_ec2_sg" {
   name        = "deepseek_ec2_sg"
   description = "Security group for EC2 instance"
-  vpc_id      = var.vpc_id
+  vpc_id      = data.aws_vpc.main_vpc.id
 
   # Allow traffic from ALB on OpenWebUI & Ollama API
   ingress {
@@ -156,7 +149,7 @@ resource "aws_lb_target_group" "deepseek_tg" {
   name     = "deepseek-target-group"
   port     = 8080
   protocol = "HTTP"
-  vpc_id   = var.vpc_id
+  vpc_id   = data.aws_vpc.main_vpc.id
 
   health_check {
     path                = "/"
@@ -172,7 +165,7 @@ resource "aws_lb_target_group" "ollama_api_tg" {
   port        = 11434
   protocol    = "HTTP"
   target_type = "instance"
-  vpc_id      = var.vpc_id
+  vpc_id      = data.aws_vpc.main_vpc.id
 
   health_check {
     path                = "/"
