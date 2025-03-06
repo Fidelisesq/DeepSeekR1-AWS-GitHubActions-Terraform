@@ -232,6 +232,14 @@ resource "aws_instance" "deepseek_ec2" {
   }
 }
 
+# Ensure EC2 instance is registered with target group
+resource "aws_lb_target_group_attachment" "deepseek_tg_attachment" {
+  target_group_arn = aws_lb_target_group.deepseek_tg.arn
+  target_id        = aws_instance.deepseek_ec2.id
+  port             = 8080
+}
+
+
 # VPC Endpoint for SSM
 resource "aws_vpc_endpoint" "ssm" {
   vpc_id            = data.aws_vpc.main_vpc.id
