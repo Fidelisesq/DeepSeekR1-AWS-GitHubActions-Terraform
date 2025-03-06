@@ -99,6 +99,7 @@ resource "aws_security_group" "deepseek_ec2_sg" {
     cidr_blocks = ["${var.my_ip}/32"]
   }
 
+/*
   # Allow traffic from VPC Endpoints
   ingress {
     from_port       = 443
@@ -106,6 +107,8 @@ resource "aws_security_group" "deepseek_ec2_sg" {
     protocol        = "tcp"
     security_groups = [aws_security_group.endpoint_sg]
   }
+
+*/
   
   # Allow all outbound traffic
   egress {
