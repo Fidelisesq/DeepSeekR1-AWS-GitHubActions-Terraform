@@ -6,6 +6,42 @@ provider "aws" {
 # Declare the caller identity data resource
 data "aws_caller_identity" "current" {}
 
+# Enable DNS support and hostnames for the VPC
+resource "aws_vpc" "main_vpc" {
+  id                     = var.vpc_id
+  enable_dns_support      = true
+  enable_dns_hostnames    = true
+}
+
+# Security Group for VPC Endpoints
+resource "aws_security_group" "endpoint_sg" {
+  name        = "vpc-endpoint-sg"
+  description = "Security group for VPC Endpoints"
+  vpc_id      = var.vpc_id
+
+  # Allow traffic from EC2 to VPC Endpoints
+  ingress {
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
+    security_groups = [aws_security_group.deepseek_ec2_sg.id]
+  }
+
+  ingress {
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    security_groups = [aws_security_group.deepseek_ec2_sg.id]
+  }
+
+  # Allow all outbound traffic
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
 
 # Security Group for ALB (Allows direct access)
 resource "aws_security_group" "alb_sg" {
@@ -151,7 +187,6 @@ data "aws_subnet" "chosen_subnet" {
   id = var.private_subnet_ids[0]
 }
 
-
 # Create an IAM Role for SSM
 resource "aws_iam_role" "ssm_role" {
   name = "EC2SSMRole"
@@ -205,10 +240,7 @@ resource "aws_vpc_endpoint" "ssm" {
   service_name      = "com.amazonaws.us-east-1.ssm"
   vpc_endpoint_type = "Interface"
   subnet_ids        = var.private_subnet_ids
-
-  # An option is ti create a dedicated security group for your endpoints,
-  # but for now I attached the same SG as your EC2 instance.
-  security_group_ids = [aws_security_group.deepseek_ec2_sg.id]
+  security_group_ids = [aws_security_group.endpoint_sg.id]  # Updated security group
 }
 
 # VPC Endpoint for EC2 Messages (used by SSM)
@@ -217,7 +249,7 @@ resource "aws_vpc_endpoint" "ec2_messages" {
   service_name      = "com.amazonaws.us-east-1.ec2messages"
   vpc_endpoint_type = "Interface"
   subnet_ids        = var.private_subnet_ids
-  security_group_ids = [aws_security_group.deepseek_ec2_sg.id]
+  security_group_ids = [aws_security_group.endpoint_sg.id]  # Updated security group
 }
 
 # VPC Endpoint for SSM Messages
@@ -226,7 +258,7 @@ resource "aws_vpc_endpoint" "ssm_messages" {
   service_name      = "com.amazonaws.us-east-1.ssmmessages"
   vpc_endpoint_type = "Interface"
   subnet_ids        = var.private_subnet_ids
-  security_group_ids = [aws_security_group.deepseek_ec2_sg.id]
+  security_group_ids = [aws_security_group.endpoint_sg.id]  # Updated security group
 }
 
 
