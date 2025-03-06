@@ -149,8 +149,8 @@ jobs:
           aws ssm describe-instance-information --region ${{ secrets.AWS_DEFAULT_REGION }} \
             --query "InstanceInformationList[?InstanceId=='${{ env.EC2_INSTANCE_ID }}']" \
             --output json
-        env:
-          TF_LOG: DEBUG
+        #env:
+          #TF_LOG: DEBUG
 
       - name: Check SSM Agent Status
         run: |
@@ -159,29 +159,51 @@ jobs:
             --instance-ids "${{ env.EC2_INSTANCE_ID }}" \
             --parameters '{"commands":["sudo systemctl status amazon-ssm-agent"]}' \
             --region ${{ secrets.AWS_DEFAULT_REGION }}
-        env:
-          TF_LOG: DEBUG
+        #env:
+          #TF_LOG: DEBUG
                
 
       - name: Install Docker via SSM
         run: |
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
-            --targets "[{\"Key\":\"instanceIds\",\"Values\":[\"${{ env.EC2_INSTANCE_ID }}\"]}]"
-            --parameters '{"commands":["sudo apt-get update","sudo apt-get install -y docker.io docker-compose","sudo systemctl enable docker","sudo systemctl start docker","sudo usermod -aG docker ubuntu"]}' \
-            --region ${{ secrets.AWS_DEFAULT_REGION }}
-        env:
-          TF_LOG: DEBUG
-
-      - name: Deploy DeepSeek Model via SSM
-        run: |
-          echo "Deploying to EC2 instance: ${{ env.EC2_INSTANCE_ID }}"
-          aws ssm send-command \
-            --document-name "AWS-RunShellScript" \
-            --targets '[{"Key":"instanceIds","Values":["${{ env.EC2_INSTANCE_ID }}"]}]' \
-            --parameters '{"commands":["docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama","sleep 20","docker exec ollama ollama pull deepseek-r1:8b","sleep 15","docker exec -d ollama ollama serve","sleep 15","docker run -d -p 8080:8080 --add-host=host.docker.internal:host-gateway -v open-webui:/app/backend/data --name open-webui --restart always ghcr.io/open-webui/open-webui:main"]}' \
+            --targets "[{\"Key\":\"InstanceIds\",\"Values\":[\"${{ env.EC2_INSTANCE_ID }}\"]}]" \
+            --parameters commands='[
+              "sudo apt-get update",
+              "sudo apt-get install -y docker.io docker-compose",
+              "sudo systemctl enable docker",
+              "sudo systemctl start docker",
+              "sudo usermod -aG docker ubuntu",
+              "sudo sed -i s/^ENABLED=1/ENABLED=0/ /etc/apt/apt.conf.d/20auto-upgrades",
+              "sleep 10"
+              "sudo reboot"
+            ]' \
             --region ${{ secrets.AWS_DEFAULT_REGION }}
           
+      - name: Wait for EC2 instance to reboot ..."
+        run: sleep 60
+
+
+      - name: Run DeepSeek Model and WebUI via SSM
+        run: |
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "[{\"Key\":\"InstanceIds\",\"Values\":[\"${{ env.EC2_INSTANCE_ID }}\"]}]" \
+            --parameters commands='[
+              "docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama",
+              "sleep 20",
+              "docker exec ollama ollama pull deepseek-r1:8b",
+              "sleep 15",
+              "docker exec -d ollama ollama serve",
+              "sleep 15",
+              "docker run -d -p 8080:8080 --add-host=host.docker.internal:host-gateway -v open-webui:/app/backend/data --name open-webui --restart always ghcr.io/open-webui/open-webui:main",
+              "sleep 15"
+            ]' \
+            --region ${{ secrets.AWS_DEFAULT_REGION }}
+      
+          echo "Waiting for WebUI to start..."
+          sleep 30              
+
       - name: Confirm WebUI is Running
         run: |
           aws ssm send-command \
