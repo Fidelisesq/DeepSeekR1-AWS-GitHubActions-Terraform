@@ -23,11 +23,6 @@ variable "instance_type" {
   type        = string
 }
 
-variable "key_id" {
-  description = "Key pair name for SSH access"
-  type        = string
-}
-
 variable "certificate_arn" {
   description = "ARN of the SSL certificate for HTTPS"
   type        = string
@@ -35,15 +30,5 @@ variable "certificate_arn" {
 
 variable "hosted_zone_id" {
   description = "Route 53 hosted zone ID for the domain"
-  type        = string
-}
-
-variable "my_ip" {
-  description = "Limited to your Your IP"
-  type        = string
-}
-
-variable "key_name" {
-  description = "SSH key"
   type        = string
 }
