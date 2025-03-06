@@ -6,6 +6,10 @@ provider "aws" {
 # Declare the caller identity data resource
 data "aws_caller_identity" "current" {}
 
+data "aws_vpc" "main_vpc" {
+  id = var.vpc_id
+}
+
 # Enable DNS support and hostnames for the VPC
 resource "aws_vpc" "main_vpc" {
   id                     = var.vpc_id
@@ -101,7 +105,7 @@ resource "aws_security_group" "deepseek_ec2_sg" {
     protocol    = "tcp"
     cidr_blocks = ["${var.my_ip}/32"]
   }
-
+  m  
   # Allow all outbound traffic
   egress {
     from_port   = 0
@@ -236,7 +240,7 @@ resource "aws_instance" "deepseek_ec2" {
 
 # VPC Endpoint for SSM
 resource "aws_vpc_endpoint" "ssm" {
-  vpc_id            = var.vpc_id
+  vpc_id            = data.aws_vpc.main_vpc.id
   service_name      = "com.amazonaws.us-east-1.ssm"
   vpc_endpoint_type = "Interface"
   subnet_ids        = var.private_subnet_ids
@@ -245,7 +249,7 @@ resource "aws_vpc_endpoint" "ssm" {
 
 # VPC Endpoint for EC2 Messages (used by SSM)
 resource "aws_vpc_endpoint" "ec2_messages" {
-  vpc_id            = var.vpc_id
+  vpc_id            = data.aws_vpc.main_vpc.id
   service_name      = "com.amazonaws.us-east-1.ec2messages"
   vpc_endpoint_type = "Interface"
   subnet_ids        = var.private_subnet_ids
@@ -254,7 +258,7 @@ resource "aws_vpc_endpoint" "ec2_messages" {
 
 # VPC Endpoint for SSM Messages
 resource "aws_vpc_endpoint" "ssm_messages" {
-  vpc_id            = var.vpc_id
+  vpc_id            = data.aws_vpc.main_vpc.id
   service_name      = "com.amazonaws.us-east-1.ssmmessages"
   vpc_endpoint_type = "Interface"
   subnet_ids        = var.private_subnet_ids
