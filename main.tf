@@ -105,7 +105,7 @@ resource "aws_security_group" "deepseek_ec2_sg" {
     protocol    = "tcp"
     cidr_blocks = ["${var.my_ip}/32"]
   }
-  m  
+  
   # Allow all outbound traffic
   egress {
     from_port   = 0
