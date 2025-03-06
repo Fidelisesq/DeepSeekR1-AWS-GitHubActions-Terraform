@@ -663,4 +663,5 @@ While the deployment process is now functional, there are opportunities I may co
 
 ## 8. Conclusion
 
-Deploying the DeepSeek Model R1 on AWS using Terraform and GitHub Actions was a rewarding experience. It not only streamlined the deployment process but also provided a scalable and secure infrastructure. By automating the deployment pipeline, I ensured consistency and repeatability, making it easier to manage and update the infrastructure in the future.
+Deploying the DeepSeek Model R1 on AWS using Terraform and GitHub Actions was a rewarding experience. It not only streamlined the deployment process but also provided a scalable and secure infrastructure. By automating the deployment pipeline, I ensured consistency and repeatability, thereby making it easier to manage and update the infrastructure in the future. 
+

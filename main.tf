@@ -51,14 +51,14 @@ resource "aws_security_group" "alb_sg" {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  # Adjust if needed
+    cidr_blocks = ["0.0.0.0/0"]  
   }
 
   ingress {
     from_port   = 11434
     to_port     = 11434
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  # Adjust if needed
+    cidr_blocks = ["0.0.0.0/0"]  
   }
 
   # Allow all outbound traffic
@@ -305,6 +305,7 @@ resource "aws_wafv2_web_acl" "deepseek_waf" {
       sampled_requests_enabled   = true
     }
   }
+
 /*
   # SQL Injection Protection
   rule {
