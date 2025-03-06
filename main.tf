@@ -30,14 +30,6 @@ resource "aws_security_group" "deepseek_ec2_sg" {
     security_groups = [aws_security_group.alb_sg.id]
   }
 
-  # Allow SSH only from your IP
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["${var.my_ip}/32"]
-  }
-
   # Allow all outbound traffic
   egress {
     from_port   = 0
