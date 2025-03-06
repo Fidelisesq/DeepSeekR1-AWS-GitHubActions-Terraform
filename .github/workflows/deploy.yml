@@ -175,7 +175,7 @@ jobs:
               "sudo systemctl start docker",
               "sudo usermod -aG docker ubuntu",
               "sudo sed -i s/^ENABLED=1/ENABLED=0/ /etc/apt/apt.conf.d/20auto-upgrades",
-              "sleep 10"
+              "sleep 10",
               "sudo reboot"
             ]' \
             --region ${{ secrets.AWS_DEFAULT_REGION }}
