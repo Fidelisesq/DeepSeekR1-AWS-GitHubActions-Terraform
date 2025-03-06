@@ -264,7 +264,7 @@ resource "aws_wafv2_web_acl" "deepseek_waf" {
 
     statement {
       rate_based_statement {
-        limit              = 200
+        limit              = 150
         aggregate_key_type = "IP"
       }
     }
