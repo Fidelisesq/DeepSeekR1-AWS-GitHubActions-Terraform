@@ -144,11 +144,12 @@ jobs:
         run: |
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
-            --targets "[{\"Key\":\"instanceIds\",\"Values\":[\"${{ env.EC2_INSTANCE_ID }}\"]}]"
+            --instance-ids "${{ env.EC2_INSTANCE_ID }}" \
             --parameters '{"commands":["sudo systemctl status amazon-ssm-agent"]}' \
-            --region ${{ secrets.AWS_DEFAULT_REGION }}    
+            --region ${{ secrets.AWS_DEFAULT_REGION }}
         env:
-          TF_LOG: DEBUG     
+          TF_LOG: DEBUG
+               
 
       - name: Install Docker via SSM
         run: |
