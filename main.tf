@@ -3,14 +3,81 @@ provider "aws" {
   region = "us-east-1"
 }
 
-# Declare the caller identity data resource
-data "aws_caller_identity" "current" {}
-
+# Fetch existing VPC
 data "aws_vpc" "main_vpc" {
   id = var.vpc_id
 }
 
-# Security Group for VPC Endpoints
+# Security Groups
+## Security Group for EC2 (Only ALB can access it)
+resource "aws_security_group" "deepseek_ec2_sg" {
+  name        = "deepseek_ec2_sg"
+  description = "Security group for EC2 instance"
+  vpc_id      = data.aws_vpc.main_vpc.id
+
+  # Allow traffic from ALB on OpenWebUI & Ollama API
+  ingress {
+    from_port       = 8080
+    to_port         = 8080
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
+  }
+
+  ingress {
+    from_port       = 11434
+    to_port         = 11434
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
+  }
+
+  # Allow SSH only from your IP
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["${var.my_ip}/32"]
+  }
+
+  # Allow all outbound traffic
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+## Security Group for ALB (Allows direct access)
+resource "aws_security_group" "alb_sg" {
+  name        = "deepseek_alb_sg"
+  description = "Security group for ALB"
+  vpc_id      = data.aws_vpc.main_vpc.id
+
+  # Allow HTTPS and Ollama API access from anywhere
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 11434
+    to_port     = 11434
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Allow all outbound traffic
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+## Security Group for VPC Endpoints
 resource "aws_security_group" "endpoint_sg" {
   name        = "vpc-endpoint-sg"
   description = "Security group for VPC Endpoints"
@@ -40,76 +107,7 @@ resource "aws_security_group" "endpoint_sg" {
   }
 }
 
-# Security Group for ALB (Allows direct access)
-resource "aws_security_group" "alb_sg" {
-  name        = "deepseek_alb_sg"
-  description = "Security group for ALB"
-  vpc_id      = data.aws_vpc.main_vpc.id
-
-  # Allow HTTPS and Ollama API access from anywhere (or restrict it to your needs)
-  ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  
-  }
-
-  ingress {
-    from_port   = 11434
-    to_port     = 11434
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  
-  }
-
-  # Allow all outbound traffic
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-# Security Group for EC2 (Only ALB can access it)
-resource "aws_security_group" "deepseek_ec2_sg" {
-  name        = "deepseek_ec2_sg"
-  description = "Security group for EC2 instance"
-  vpc_id      = data.aws_vpc.main_vpc.id
-
-  # Allow traffic from ALB on OpenWebUI & Ollama API
-  ingress {
-    from_port       = 8080
-    to_port         = 8080
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb_sg.id]
-  }
-
-  ingress {
-    from_port       = 11434
-    to_port         = 11434
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb_sg.id]
-  }
-
-  # Allow SSH only from your IP
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["${var.my_ip}/32"]
-  }
-
-  
-  # Allow all outbound traffic
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-# Application Load Balancer (Public Subnet)
+# Load Balancer
 resource "aws_lb" "deepseek_lb" {
   name               = "deepseek-alb"
   internal           = false   # Public ALB
@@ -118,7 +116,7 @@ resource "aws_lb" "deepseek_lb" {
   subnets            = var.public_subnet_ids  # ALB must be in public subnets
 }
 
-# Listener for ALB (HTTPS) forwards traffic to OpenWebUI
+## Listener for ALB (HTTPS) forwards traffic to OpenWebUI
 resource "aws_lb_listener" "https_listener" {
   load_balancer_arn = aws_lb.deepseek_lb.arn
   port              = 443
@@ -132,7 +130,7 @@ resource "aws_lb_listener" "https_listener" {
   }
 }
 
-# Listener for Ollama API
+## Listener for Ollama API
 resource "aws_lb_listener" "ollama_listener" {
   load_balancer_arn = aws_lb.deepseek_lb.arn
   port              = 11434
@@ -177,15 +175,7 @@ resource "aws_lb_target_group" "ollama_api_tg" {
   }
 }
 
-data "aws_key_pair" "existing_key" {
-  key_pair_id = var.key_id
-}
-
-data "aws_subnet" "chosen_subnet" {
-  id = var.private_subnet_ids[0]
-}
-
-# Create an IAM Role for SSM
+# IAM Role for SSM
 resource "aws_iam_role" "ssm_role" {
   name = "EC2SSMRole"
 
@@ -201,23 +191,23 @@ resource "aws_iam_role" "ssm_role" {
   })
 }
 
-# Attach the AmazonSSMManagedInstanceCore policy
+# Attach AmazonSSMManagedInstanceCore policy
 resource "aws_iam_role_policy_attachment" "ssm_policy" {
   role       = aws_iam_role.ssm_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
-# Attach the IAM role to the EC2 instance
+# IAM Instance Profile
 resource "aws_iam_instance_profile" "ssm_instance_profile" {
   name = "EC2SSMInstanceProfile"
   role = aws_iam_role.ssm_role.name
 }
 
-# Attach the IAM profile to the EC2 instance
+# EC2 Instance
 resource "aws_instance" "deepseek_ec2" {
   ami                  = var.ami_id
   instance_type        = var.instance_type
-  subnet_id            = data.aws_subnet.chosen_subnet.id
+  subnet_id            = var.private_subnet_ids[0]
   security_groups      = [aws_security_group.deepseek_ec2_sg.id]
   iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.name
 
@@ -232,43 +222,23 @@ resource "aws_instance" "deepseek_ec2" {
   }
 }
 
-# Ensure EC2 instance is registered with target group
+# Attach EC2 Instance to Target Group
 resource "aws_lb_target_group_attachment" "deepseek_tg_attachment" {
   target_group_arn = aws_lb_target_group.deepseek_tg.arn
   target_id        = aws_instance.deepseek_ec2.id
   port             = 8080
 }
 
-
-# VPC Endpoint for SSM
+# VPC Endpoints for SSM
 resource "aws_vpc_endpoint" "ssm" {
   vpc_id            = data.aws_vpc.main_vpc.id
   service_name      = "com.amazonaws.us-east-1.ssm"
   vpc_endpoint_type = "Interface"
   subnet_ids        = var.private_subnet_ids
-  security_group_ids = [aws_security_group.endpoint_sg.id]  # Updated security group
+  security_group_ids = [aws_security_group.endpoint_sg.id]
 }
 
-# VPC Endpoint for EC2 Messages (used by SSM)
-resource "aws_vpc_endpoint" "ec2_messages" {
-  vpc_id            = data.aws_vpc.main_vpc.id
-  service_name      = "com.amazonaws.us-east-1.ec2messages"
-  vpc_endpoint_type = "Interface"
-  subnet_ids        = var.private_subnet_ids
-  security_group_ids = [aws_security_group.endpoint_sg.id]  # Updated security group
-}
-
-# VPC Endpoint for SSM Messages
-resource "aws_vpc_endpoint" "ssm_messages" {
-  vpc_id            = data.aws_vpc.main_vpc.id
-  service_name      = "com.amazonaws.us-east-1.ssmmessages"
-  vpc_endpoint_type = "Interface"
-  subnet_ids        = var.private_subnet_ids
-  security_group_ids = [aws_security_group.endpoint_sg.id]  # Updated security group
-}
-
-
-# Route 53 DNS Record to point to ALB
+# Route 53 DNS Record
 resource "aws_route53_record" "deepseek_dns" {
   zone_id = var.hosted_zone_id
   name    = "deepseek.fozdigitalz.com"
@@ -280,6 +250,7 @@ resource "aws_route53_record" "deepseek_dns" {
     evaluate_target_health = false
   }
 }
+
 
 #AWS Web Application Firewall
 resource "aws_wafv2_web_acl" "deepseek_waf" {
