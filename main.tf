@@ -45,17 +45,10 @@ resource "aws_security_group" "alb_sg" {
   description = "Security group for ALB"
   vpc_id      = data.aws_vpc.main_vpc.id
 
-  # Allow HTTPS and Ollama API access from anywhere
+  # Allow HTTPS from anywhere
   ingress {
     from_port   = 443
     to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 11434
-    to_port     = 11434
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -122,19 +115,6 @@ resource "aws_lb_listener" "https_listener" {
   }
 }
 
-## Listener for Ollama API
-resource "aws_lb_listener" "ollama_listener" {
-  load_balancer_arn = aws_lb.deepseek_lb.arn
-  port              = 11434
-  protocol          = "HTTPS"
-  certificate_arn   = var.certificate_arn
-
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.ollama_api_tg.arn
-  }
-}
-
 # Target Groups
 resource "aws_lb_target_group" "deepseek_tg" {
   name     = "deepseek-target-group"
@@ -151,21 +131,6 @@ resource "aws_lb_target_group" "deepseek_tg" {
   }
 }
 
-resource "aws_lb_target_group" "ollama_api_tg" {
-  name        = "ollama-api-target-group"
-  port        = 11434
-  protocol    = "HTTP"
-  target_type = "instance"
-  vpc_id      = data.aws_vpc.main_vpc.id
-
-  health_check {
-    path                = "/"
-    interval            = 30
-    timeout             = 5
-    healthy_threshold   = 2
-    unhealthy_threshold = 2
-  }
-}
 
 # IAM Role for SSM
 resource "aws_iam_role" "ssm_role" {
