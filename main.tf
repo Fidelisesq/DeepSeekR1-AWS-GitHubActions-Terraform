@@ -193,7 +193,30 @@ resource "aws_vpc_endpoint" "ssm" {
   vpc_endpoint_type = "Interface"
   subnet_ids        = var.private_subnet_ids
   security_group_ids = [aws_security_group.endpoint_sg.id]
+  private_dns_enabled = true
 }
+
+
+# VPC Endpoint for EC2 Messages (Used by SSM)
+resource "aws_vpc_endpoint" "ec2_messages" {
+  vpc_id            = data.aws_vpc.main_vpc.id
+  service_name      = "com.amazonaws.us-east-1.ec2messages"
+  vpc_endpoint_type = "Interface"
+  subnet_ids        = var.private_subnet_ids
+  security_group_ids = [aws_security_group.endpoint_sg.id]
+  private_dns_enabled = true
+}
+
+# VPC Endpoint for SSM Messages (Used by SSM)
+resource "aws_vpc_endpoint" "ssm_messages" {
+  vpc_id            = data.aws_vpc.main_vpc.id
+  service_name      = "com.amazonaws.us-east-1.ssmmessages"
+  vpc_endpoint_type = "Interface"
+  subnet_ids        = var.private_subnet_ids
+  security_group_ids = [aws_security_group.endpoint_sg.id]
+  private_dns_enabled = true
+}
+
 
 # Route 53 DNS Record
 resource "aws_route53_record" "deepseek_dns" {
