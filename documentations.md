@@ -941,19 +941,8 @@ I can destroy my infrastructure when I trigger my workflow in different ways. My
 
 ## **6. Challenges Faced & Lesson Learned**
 
-Deploying the DeepSeek Model R1 on AWS using Terraform and GitHub Actions presented several challenges, each of which taught valuable lessons for improving the deployment process and infrastructure design.
+Learning from the challenges in my first deployment, modifying the setup was easier—I moved the EC2 instance to a private subnet, switched from SSH to AWS SSM for secure access, and integrated AWS WAF for better protection. However, I still researched best practices for implementing AWS-managed WAF rules to enhance security effectively.
 
-### **1. Security Configuration**
-- **Challenge**: Configuring security groups and IAM roles to balance accessibility and security was complex. Misconfigurations could expose the EC2 instance or over-privilege IAM roles.
-- **Lesson Learned**: Follow the principle of least privilege. Restrict SSH access to specific IPs, limit IAM permissions, and ensure only necessary ports are open.
-
-### **2. Workflow Reliability**
-- **Challenge**: My workflow failed countless times owing to different issues from terraform config to secerts and variables and I had to troubleshoot the issue on different ocassions employing debugging. The EC2 instance required a reboot after Docker installation, causing delays in the GitHub Actions workflow. Without proper handling, subsequent steps could fail.
-- **Lesson Learned**: Automate delays (e.g., `sleep`) and post-reboot tasks to ensure smooth workflow execution. Modularize the workflow for better reliability.
-
-### **3. State and Code Management**
-- **Challenge**: Managing the Terraform state file in S3 and maintaining a monolithic configuration led to potential security risks and reduced reusability.
-- **Lesson Learned**: Use versioning, encryption, and access controls for the Terraform state. Break configurations into reusable modules for better organization and maintainability.
 ---
 
 
@@ -961,18 +950,10 @@ Deploying the DeepSeek Model R1 on AWS using Terraform and GitHub Actions presen
 
 While the deployment process is now functional, there are opportunities I may consider to enhance scalability, security, and cost-efficiency.
 
-### **1. Scalability**
-- Implement **auto-scaling** for the EC2 instance to handle varying loads and ensure optimal performance during peak usage.
-
-### **2. Monitoring and Security**
-- Add **CloudWatch alarms and logs** for real-time monitoring and troubleshooting. Enhance security by using **AWS Systems Manager** for instance management instead of SSH.
-
-### **3. Cost Optimization**
-- Explore **spot instances** or **reserved instances** to reduce costs. Additionally, consider upgrading to **GPU-powered instances** for better performance if the model is computationally intensive.
+In my first deployment, I considered improvements like moving EC2 to a private subnet, using SSM instead of SSH, and adding WAF, which I have now implemented. Additionally, I’m exploring **CloudWatch for monitoring, auto-scaling for better resource management, and GPU instances for enhanced performance**, though AWS approval for GPU is still pending. These refinements aim to make the deployment more secure, scalable, and cost-efficient.
 
 ---
 
 ## 8. Conclusion
 
-Deploying the DeepSeek Model R1 on AWS using Terraform and GitHub Actions was a rewarding experience. It not only streamlined the deployment process but also provided a scalable and secure infrastructure. By automating the deployment pipeline, I ensured consistency and repeatability, thereby making it easier to manage and update the infrastructure in the future. 
-
+This deployment has evolved significantly from the initial setup, incorporating **better security, automation, and scalability** based on lessons learned. Moving EC2 to a private subnet, using **AWS SSM** instead of SSH, and integrating **AWS WAF** has strengthened security, while **CloudWatch and auto-scaling** are now key considerations for future improvements. As I continue refining the architecture, I’m also exploring **GPU-powered instances** for better performance once AWS approval is granted. These enhancements ensure a more **resilient, efficient, and secure** deployment of the DeepSeek Model R1 on AWS.
