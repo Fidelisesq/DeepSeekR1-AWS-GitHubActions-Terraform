@@ -175,7 +175,7 @@ jobs:
             --region ${{ secrets.AWS_DEFAULT_REGION }}
           
       - name: Wait for EC2 instance to reboot ..."
-        run: sleep 60
+        run: sleep 50
 
 
       - name: Run DeepSeek Model and WebUI via SSM
