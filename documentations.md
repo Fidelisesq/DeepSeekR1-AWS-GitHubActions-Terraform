@@ -327,6 +327,8 @@ resource "aws_route53_record" "deepseek_dns" {
 ```
 
 ### AWS WAF Configuration
+
+```hcl
 #AWS Web Application Firewall
 resource "aws_wafv2_web_acl" "deepseek_waf" {
   name        = "deepseek-waf"
@@ -427,7 +429,6 @@ resource "aws_wafv2_web_acl" "deepseek_waf" {
     }
   }
 
-
 # AWS Managed Common Rule Set
 rule {
   name     = "CommonRuleSet"
@@ -487,7 +488,6 @@ rule {
   }
 }
 
-
 #WAF Attachment to ALB
 resource "aws_wafv2_web_acl_association" "deepseek_waf_alb" {
   resource_arn = aws_lb.deepseek_lb.arn
@@ -496,6 +496,7 @@ resource "aws_wafv2_web_acl_association" "deepseek_waf_alb" {
   aws_wafv2_web_acl.deepseek_waf
   ]
 }
+```
 
 ### Terraform Backend (S3)
 
@@ -512,10 +513,9 @@ terraform {
 }
 ```
 
-
 ### Variables Configuration
 
-The variables.tf file defines all the input variables required for the Terraform configuration. These variables make the configuration reusable and customizable.
+The `variables.tf` file defines all the input variables required for the Terraform configuration. These variables make the configuration reusable and customizable.
 
 ```hcl
 variable "vpc_id" {
@@ -556,7 +556,7 @@ variable "hosted_zone_id" {
 
 ### Terraform.tfvars
 
-The `terraform.tfvars` file is used to assign values to the variables defined in variables.tf. This file is typically not committed to version control (e.g., Git) for security reasons, as it may contain sensitive information like AWS credentials. I added `terraform.tfvars` to `.gitignore` so it won't be tracked. I provided the variables and secrets in github using `environment variables` and `secrets`. Also, the values below are made up and not real.
+The `terraform.tfvars` file is used to assign values to the variables defined in `variables.tf`. This file is typically not committed to version control (e.g., Git) for security reasons, as it may contain sensitive information like AWS credentials. I added `terraform.tfvars` to `.gitignore` so it won't be tracked. I provided the variables and secrets in github using `environment variables` and `secrets`. Also, the values below are made up and not real.
 
 ```hcl
 vpc_id = "vpc-012345678910"
@@ -774,15 +774,12 @@ The **post-apply** job configures the EC2 instance after Terraform provisions it
           private_subnet_ids = ${{ secrets.PRIVATE_SUBNET_IDS }}
           EOF
 
-    
       - name: Verify SSM Connection
         run: |
           echo "Verifying SSM Connection..."
           aws ssm describe-instance-information --region ${{ secrets.AWS_DEFAULT_REGION }} \
             --query "InstanceInformationList[?InstanceId=='${{ env.EC2_INSTANCE_ID }}']" \
             --output json
-        #env:
-          #TF_LOG: DEBUG
 
       - name: Check SSM Agent Status
         run: |
@@ -791,10 +788,7 @@ The **post-apply** job configures the EC2 instance after Terraform provisions it
             --instance-ids "${{ env.EC2_INSTANCE_ID }}" \
             --parameters '{"commands":["sudo systemctl status amazon-ssm-agent"]}' \
             --region ${{ secrets.AWS_DEFAULT_REGION }}
-        #env:
-          #TF_LOG: DEBUG
-               
-
+          
       - name: Install Docker via SSM
         run: |
           aws ssm send-command \
@@ -814,7 +808,6 @@ The **post-apply** job configures the EC2 instance after Terraform provisions it
           
       - name: Wait for EC2 instance to reboot ..."
         run: sleep 50
-
 
       - name: Run DeepSeek Model and WebUI via SSM
         run: |
@@ -845,7 +838,6 @@ The **post-apply** job configures the EC2 instance after Terraform provisions it
             --region ${{ secrets.AWS_DEFAULT_REGION }}
 
 ```
-
 ### Destroy Job
 
 The **destroy** job tears down the infrastructure when triggered manually or via a commit message containing "destroy".
