@@ -265,88 +265,57 @@ resource "aws_wafv2_web_acl" "deepseek_waf" {
     }
   }
 
-/*
-  # SQL Injection Protection
+# Amazon IP Reputation List (Blocks known bad IPs, reconnaissance, DDoS)
   rule {
-    name     = "AWS-SQLInjection-Protection"
+    name     = "AmazonIPReputationRule"
     priority = 2
 
-    action {
-      block {}
+    override_action { 
+      none {} 
     }
 
     statement {
       managed_rule_group_statement {
-        name        = "AWSManagedRulesSQLiRuleSet"  # Ensure the exact rule group name
         vendor_name = "AWS"
+        name        = "AWSManagedRulesAmazonIpReputationList"
+
+        # OPTIONAL: Override specific rules inside the group
+        rule_action_override {
+          action_to_use {
+            block {}
+          }
+          name = "AWSManagedIPReputationList"
+        }
+
+        rule_action_override {
+          action_to_use {
+            block {}
+          }
+          name = "AWSManagedReconnaissanceList"
+        }
+
+        rule_action_override {
+          action_to_use {
+            count {}
+          }
+          name = "AWSManagedIPDDoSList"
+        }
       }
     }
 
     visibility_config {
       cloudwatch_metrics_enabled = true
-      metric_name                = "SQLInjectionProtection"
+      metric_name                = "AmazonIPReputationRule"
       sampled_requests_enabled   = true
     }
-  }
+  } 
 
-  # XSS Protection
-  rule {
-    name     = "AWS-XSS-Protection"
-    priority = 3
-
-    action {
-      block {}
-    }
-
-    statement {
-      managed_rule_group_statement {
-        name        = "AWSManagedRulesXSSRuleSet"  # Ensure the exact rule group name
-        vendor_name = "AWS"
-      }
-    }
-
-    visibility_config {
-      cloudwatch_metrics_enabled = true
-      metric_name                = "XSSProtection"
-      sampled_requests_enabled   = true
-    }
-  }
-  */
-
-  
-
-/*
-  # Bot Control Protection
-  rule {
-    name     = "AWS-Bot-Control"
-    priority = 4
-
-    action {
-      block {}
-    }
-
-    statement {
-      managed_rule_group_statement {
-        name        = "AWSManagedRulesBotControlRuleSet"  # Ensure the exact rule group name
-        vendor_name = "AWS"
-      }
-    }
-
-    visibility_config {
-      cloudwatch_metrics_enabled = true
-      metric_name                = "BotProtection"
-      sampled_requests_enabled   = true
-    }
-  }
-
-*/
   visibility_config {
     cloudwatch_metrics_enabled = true
     metric_name                = "deepseek-waf"
     sampled_requests_enabled   = true
   }
 }
-
 
 
 #WAF Attachement to ALB

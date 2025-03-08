@@ -1,9 +1,19 @@
-# Deploying DeepSeek Model R1 on AWS via Terraform & GitHub Actions
+# Deploying DeepSeek Model R1 on AWS via Terraform & GitHub Actions - Update
 ![Architecture Diagram](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/architecture%20diagram.png)
 
 Hey there! In this project documentation, I’m going to walk you through how I deployed the **DeepSeek Model R1** on AWS using **Terraform** and **GitHub Actions**. If you’ve ever tried deploying a machine learning model, you know it can get pretty complicated—especially when you’re juggling multiple AWS services. To make things easier, I decided to automate the whole process using Terraform for infrastructure as code and GitHub Actions for CI/CD. Spoiler alert: it worked like a charm!
 
 This project involved setting up an EC2 instance, an Application Load Balancer (ALB), security groups, IAM roles, and even a custom domain using Route 53. The best part? Everything was automated, so I didn’t have to manually configure resources every time I made a change. Whether you’re a seasoned DevOps pro or just getting started with cloud deployments, I hope this walkthrough gives you some useful insights (and maybe saves you a few headaches along the way).
+
+
+In this update, I’ve **migrated my EC2 instance to a private subnet** for improved security while still ensuring seamless access for application configuration and management. Here’s what changed:  
+
+✅ **Private Subnet Deployment** – The EC2 instance now runs in a private subnet instead of a public one.  
+✅ **Internet Access via NAT Gateway** – The instance can pull updates and dependencies while remaining inaccessible from the public internet.  
+✅ **AWS Systems Manager (SSM) for Secure Access** – Instead of SSH, I’m using SSM to manage and interact with the instance securely.  
+✅ **AWS WAF for Backend Protection** – Added AWS Web Application Firewall (WAF) to safeguard against malicious traffic and attacks.
+
+This approach **enhances security** while maintaining full operational control over the deployment. Next steps? Further optimizing performance and security! 
 
 ---
 
@@ -44,7 +54,7 @@ The goal of this project was to deploy the **DeepSeek Model R1** on AWS, making 
 - **EC2 Instance**: Hosts the DeepSeek model in a Docker container and associated services.
 - **Application Load Balancer (ALB)**: Distributes traffic to the EC2 instance and handles SSL termination.
 - **Security Groups**: Control inbound and outbound traffic to the ALB and EC2 instance.
-- **IAM Roles**: Provide the necessary permissions for the EC2 instance.
+- **IAM Roles**: Provide the necessary permissions for the EC2 instance to allow AWS Systems Manager Access
 - **Route 53**: Manages DNS records for the ALB. I just employed a cetificate I already have in us-east-1 and a ready public hosted zone in same region.
 - **Terraform Backend**: Stores the Terraform state file in an S3 bucket for team collaboration.
 
