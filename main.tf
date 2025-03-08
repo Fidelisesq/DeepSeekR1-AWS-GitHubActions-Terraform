@@ -3,49 +3,13 @@ provider "aws" {
   region = "us-east-1"
 }
 
-# Fetch existing VPC
-data "aws_vpc" "main_vpc" {
-  id = var.vpc_id
-}
-
-# Security Groups
-## Security Group for EC2 (Only ALB can access it)
-resource "aws_security_group" "deepseek_ec2_sg" {
-  name        = "deepseek_ec2_sg"
-  description = "Security group for EC2 instance"
-  vpc_id      = data.aws_vpc.main_vpc.id
-
-  # Allow traffic from ALB
-  ingress {
-    from_port       = 8080
-    to_port         = 8080
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb_sg.id]
-  }
-
-  ingress {
-    from_port       = 11434
-    to_port         = 11434
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb_sg.id]
-  }
-
-  # Allow all outbound traffic
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-## Security Group for ALB (Allows direct access)
+# Security Group for ALB
 resource "aws_security_group" "alb_sg" {
   name        = "deepseek_alb_sg"
   description = "Security group for ALB"
-  vpc_id      = data.aws_vpc.main_vpc.id
+  vpc_id      = var.vpc_id
 
-  # Allow HTTPS from anywhere
+  # Allow HTTPS traffic from anywhere
   ingress {
     from_port   = 443
     to_port     = 443
@@ -53,34 +17,20 @@ resource "aws_security_group" "alb_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Allow all outbound traffic
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+  # Allow HTTP traffic for testing (optional, remove if not needed)
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-}
 
-## Security Group for VPC Endpoints
-resource "aws_security_group" "endpoint_sg" {
-  name        = "vpc-endpoint-sg"
-  description = "Security group for VPC Endpoints"
-  vpc_id      = data.aws_vpc.main_vpc.id
-
-  # Allow traffic from EC2 to VPC Endpoints
+  # Allow TCP traffic on port 11434 from anywhere
   ingress {
-    from_port       = 443
-    to_port         = 443
-    protocol        = "tcp"
-    security_groups = [aws_security_group.deepseek_ec2_sg.id]
-  }
-
-  ingress {
-    from_port       = 22
-    to_port         = 22
-    protocol        = "tcp"
-    security_groups = [aws_security_group.deepseek_ec2_sg.id]
+    from_port = 11434
+    to_port = 11434
+    protocol = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   # Allow all outbound traffic
@@ -92,16 +42,57 @@ resource "aws_security_group" "endpoint_sg" {
   }
 }
 
-# Load Balancer
+# Security Group for EC2 (only allows traffic from ALB)
+resource "aws_security_group" "deepseek_ec2_sg" {
+  name        = "deepseek_ec2_sg"
+  description = "Security group for EC2 instance"
+  vpc_id      = var.vpc_id
+
+  # Allow traffic from ALB on port 8080
+  ingress {
+    from_port       = 8080
+    to_port         = 8080
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
+  }
+
+  # Allow SSH for administration (optional, restrict CIDR in production)
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["${var.my_ip}/32"] # Change to your IP for security
+  }
+
+  #Allow tcp traffic on port 11434 from ALB
+  ingress {
+    from_port = 11434
+    to_port = 11434
+    protocol = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
+  }
+
+  # Allow all outbound traffic
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# Load Balancer (ALB)
 resource "aws_lb" "deepseek_lb" {
   name               = "deepseek-alb"
-  internal           = false   # Public ALB
+  internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb_sg.id]
-  subnets            = var.public_subnet_ids  # ALB must be in public subnets
+  subnets            = var.subnet_ids
+
+  enable_deletion_protection = false
 }
 
-## Listener for ALB (HTTPS) forwards traffic to OpenWebUI
+# Listener for ALB (HTTPS) forwards traffic to the openwebUI
 resource "aws_lb_listener" "https_listener" {
   load_balancer_arn = aws_lb.deepseek_lb.arn
   port              = 443
@@ -115,12 +106,59 @@ resource "aws_lb_listener" "https_listener" {
   }
 }
 
-# Target Groups
+# HTTP Listener (Port 80) - Redirects to HTTPS
+resource "aws_lb_listener" "http_listener" {
+  load_balancer_arn = aws_lb.deepseek_lb.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type = "redirect"
+
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+}
+
+# Listener for ALB (Ollama API on port 11434)
+resource "aws_lb_listener" "ollama_listener" {
+  load_balancer_arn = aws_lb.deepseek_lb.arn
+  port              = 11434
+  protocol          = "HTTPS"
+  certificate_arn = var.certificate_arn
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.ollama_api_tg.arn
+  }
+}
+
+
+# Open_WebUI Target Group for ALB
 resource "aws_lb_target_group" "deepseek_tg" {
   name     = "deepseek-target-group"
   port     = 8080
   protocol = "HTTP"
-  vpc_id   = data.aws_vpc.main_vpc.id
+  vpc_id   = var.vpc_id
+
+  health_check {
+    path                = "/"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+}
+# Ollama container Target Group for ALB
+resource "aws_lb_target_group" "ollama_api_tg" {
+  name       = "ollama-api-target-group"
+  port       = 11434
+  protocol   = "HTTP"
+  target_type = "instance"
+  vpc_id     = var.vpc_id
 
   health_check {
     path                = "/"
@@ -131,42 +169,26 @@ resource "aws_lb_target_group" "deepseek_tg" {
   }
 }
 
-
-# IAM Role for SSM
-resource "aws_iam_role" "ssm_role" {
-  name = "EC2SSMRole"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Principal = {
-        Service = "ec2.amazonaws.com"
-      }
-      Action = "sts:AssumeRole"
-    }]
-  })
+# Attach EC2 instance to Target Group
+resource "aws_lb_target_group_attachment" "deepseek_ec2_attachment" {
+  target_group_arn = aws_lb_target_group.deepseek_tg.arn
+  target_id        = aws_instance.deepseek_ec2.id
+  port             = 8080
 }
 
-# Attach AmazonSSMManagedInstanceCore policy
-resource "aws_iam_role_policy_attachment" "ssm_policy" {
-  role       = aws_iam_role.ssm_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+
+data "aws_key_pair" "existing_key" {
+  key_pair_id = var.key_id
 }
 
-# IAM Instance Profile
-resource "aws_iam_instance_profile" "ssm_instance_profile" {
-  name = "EC2SSMInstanceProfile"
-  role = aws_iam_role.ssm_role.name
-}
-
-# EC2 Instance
+# EC2 Instance with IAM Role and gp3 EBS (48GB)
 resource "aws_instance" "deepseek_ec2" {
-  ami                  = var.ami_id
-  instance_type        = var.instance_type
-  subnet_id            = var.private_subnet_ids[0]
-  security_groups      = [aws_security_group.deepseek_ec2_sg.id]
-  iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.name
+  ami             = var.ami_id
+  instance_type   = var.instance_type
+  key_name        = data.aws_key_pair.existing_key.key_name
+  subnet_id       = var.public_subnet_id
+  security_groups = [aws_security_group.deepseek_ec2_sg.id]
+  #iam_instance_profile = aws_iam_instance_profile.deepseek_ec2_profile.name
 
   root_block_device {
     volume_size           = 48
@@ -179,46 +201,7 @@ resource "aws_instance" "deepseek_ec2" {
   }
 }
 
-# Attach EC2 Instance to Target Group
-resource "aws_lb_target_group_attachment" "deepseek_tg_attachment" {
-  target_group_arn = aws_lb_target_group.deepseek_tg.arn
-  target_id        = aws_instance.deepseek_ec2.id
-  port             = 8080
-}
-
-# VPC Endpoints for SSM
-resource "aws_vpc_endpoint" "ssm" {
-  vpc_id            = data.aws_vpc.main_vpc.id
-  service_name      = "com.amazonaws.us-east-1.ssm"
-  vpc_endpoint_type = "Interface"
-  subnet_ids        = var.private_subnet_ids
-  security_group_ids = [aws_security_group.endpoint_sg.id]
-  private_dns_enabled = true
-}
-
-
-# VPC Endpoint for EC2 Messages (Used by SSM)
-resource "aws_vpc_endpoint" "ec2_messages" {
-  vpc_id            = data.aws_vpc.main_vpc.id
-  service_name      = "com.amazonaws.us-east-1.ec2messages"
-  vpc_endpoint_type = "Interface"
-  subnet_ids        = var.private_subnet_ids
-  security_group_ids = [aws_security_group.endpoint_sg.id]
-  private_dns_enabled = true
-}
-
-# VPC Endpoint for SSM Messages (Used by SSM)
-resource "aws_vpc_endpoint" "ssm_messages" {
-  vpc_id            = data.aws_vpc.main_vpc.id
-  service_name      = "com.amazonaws.us-east-1.ssmmessages"
-  vpc_endpoint_type = "Interface"
-  subnet_ids        = var.private_subnet_ids
-  security_group_ids = [aws_security_group.endpoint_sg.id]
-  private_dns_enabled = true
-}
-
-
-# Route 53 DNS Record
+# Route 53 DNS Record for ALB
 resource "aws_route53_record" "deepseek_dns" {
   zone_id = var.hosted_zone_id
   name    = "deepseek.fozdigitalz.com"
@@ -227,181 +210,9 @@ resource "aws_route53_record" "deepseek_dns" {
   alias {
     name                   = aws_lb.deepseek_lb.dns_name
     zone_id                = aws_lb.deepseek_lb.zone_id
-    evaluate_target_health = false
+    evaluate_target_health = true
   }
 }
-
-
-#AWS Web Application Firewall
-resource "aws_wafv2_web_acl" "deepseek_waf" {
-  name        = "deepseek-waf"
-  description = "WAF for ALB protecting backend"
-  scope       = "REGIONAL"
-
-  default_action {
-    allow {}
-  }
-
-  # Rate Limiting Rule
-  rule {
-    name     = "RateLimitRule"
-    priority = 1
-
-    action {
-      block {}
-    }
-
-    statement {
-      rate_based_statement {
-        limit              = 150
-        aggregate_key_type = "IP"
-      }
-    }
-
-    visibility_config {
-      cloudwatch_metrics_enabled = true
-      metric_name                = "RateLimit"
-      sampled_requests_enabled   = true
-    }
-  }
-
-# Amazon IP Reputation List (Blocks known bad IPs, reconnaissance, DDoS)
-  rule {
-    name     = "AmazonIPReputationRule"
-    priority = 2
-
-    override_action { 
-      none {} 
-    }
-
-    statement {
-      managed_rule_group_statement {
-        vendor_name = "AWS"
-        name        = "AWSManagedRulesAmazonIpReputationList"
-
-        # OPTIONAL: Override specific rules inside the group
-        rule_action_override {
-          action_to_use {
-            block {}
-          }
-          name = "AWSManagedIPReputationList"
-        }
-
-        rule_action_override {
-          action_to_use {
-            block {}
-          }
-          name = "AWSManagedReconnaissanceList"
-        }
-
-        rule_action_override {
-          action_to_use {
-            count {}
-          }
-          name = "AWSManagedIPDDoSList"
-        }
-      }
-    }
-
-    visibility_config {
-      cloudwatch_metrics_enabled = true
-      metric_name                = "AmazonIPReputationRule"
-      sampled_requests_enabled   = true
-    }
-  } 
-
-# AWS Managed Known Bad Inputs Rule Set
-  rule {
-    name     = "KnownBadInputsRule"
-    priority = 3
-
-    override_action {
-      none {}
-    }
-
-    statement {
-      managed_rule_group_statement {
-        vendor_name = "AWS"
-        name        = "AWSManagedRulesKnownBadInputsRuleSet"
-      }
-    }
-    visibility_config {
-      cloudwatch_metrics_enabled = true
-      metric_name                = "KnownBadInputsRule"
-      sampled_requests_enabled   = true
-    }
-  }
-
-
-# AWS Managed Common Rule Set
-rule {
-  name     = "CommonRuleSet"
-  priority = 4
-
-  override_action {
-    none {}  # Ensures AWS WAF applies its built-in block actions
-  }
-
-  statement {
-    managed_rule_group_statement {
-      vendor_name = "AWS"
-      name        = "AWSManagedRulesCommonRuleSet"
-
-      # Override specific rules that are set to "Count" by default, so they actually block bad traffic.
-      rule_action_override {
-        action_to_use {
-          block {}
-        }
-        name = "CrossSiteScripting_URIPATH_RC_COUNT"
-      }
-
-      rule_action_override {
-        action_to_use {
-          block {}
-        }
-        name = "CrossSiteScripting_BODY_RC_COUNT"
-      }
-
-      rule_action_override {
-        action_to_use {
-          block {}
-        }
-        name = "CrossSiteScripting_QUERYARGUMENTS_RC_COUNT"
-      }
-
-      rule_action_override {
-        action_to_use {
-          block {}
-        }
-        name = "CrossSiteScripting_COOKIE_RC_COUNT"
-      }
-    }
-  }
-
-  visibility_config {
-    cloudwatch_metrics_enabled = true
-    metric_name                = "CommonRuleSet"
-    sampled_requests_enabled   = true
-  }
-}
-
-  visibility_config {
-    cloudwatch_metrics_enabled = true
-    metric_name                = "deepseek-waf"
-    sampled_requests_enabled   = true
-  }
-}
-
-
-#WAF Attachment to ALB
-resource "aws_wafv2_web_acl_association" "deepseek_waf_alb" {
-  resource_arn = aws_lb.deepseek_lb.arn
-  web_acl_arn  = aws_wafv2_web_acl.deepseek_waf.arn
-  depends_on = [aws_lb.deepseek_lb,
-  aws_wafv2_web_acl.deepseek_waf
-  ]
-}
-
 
 # Terraform Backend (S3 for State Management)
 terraform {
@@ -412,3 +223,4 @@ terraform {
     encrypt        = true
   }
 }
+

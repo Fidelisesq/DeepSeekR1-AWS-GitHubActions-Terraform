@@ -1,25 +1,37 @@
+variable "aws_region" {
+  description = "AWS region to deploy resources"
+  type        = string
+  default     = "us-east-1"
+}
+
 variable "vpc_id" {
-  description = "The VPC ID where resources will be deployed"
+  description = "Existing VPC ID where resources will be deployed"
   type        = string
 }
 
-variable "public_subnet_ids" {
-  description = "List of public subnet IDs for ALB"
+variable "subnet_ids" {
+  description = "Subnet ID for the ALB"
   type        = list(string)
 }
 
-variable "private_subnet_ids" {
-  description = "List of private subnet IDs for EC2 instances"
-  type        = list(string)
+variable "public_subnet_id" {
+  description = "Public subnet ID for the EC2 instance"
+  type        = string
+}
+
+variable "key_name" {  # Updated from key_name to key_id
+  description = "Key ID for EC2 instance"
+  type        = string
+}
+
+
+variable "key_id" {
+  description = "The ID of the key pair to use for the EC2 instance"
+  type        = string
 }
 
 variable "ami_id" {
-  description = "AMI ID for the EC2 instance"
-  type        = string
-}
-
-variable "instance_type" {
-  description = "Instance type for the EC2 instance"
+  description = "Amazon Machine Image (AMI) ID"
   type        = string
 }
 
@@ -29,6 +41,22 @@ variable "certificate_arn" {
 }
 
 variable "hosted_zone_id" {
-  description = "Route 53 hosted zone ID for the domain"
+  description = "ID of the existing Route 53 hosted zone for fozdigitalz.com in us-east-1"
   type        = string
 }
+
+variable "terraform_state_bucket" {
+  description = "The name of the S3 bucket for Terraform state"
+  type        = string
+}
+
+variable "instance_type" {
+  description = "Instance type for the EC2 instance"
+  type        = string
+}
+
+variable "my_ip" {
+  description = "IP address allowed to SSH"
+  type        = string
+}
+
