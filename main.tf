@@ -15,7 +15,7 @@ resource "aws_security_group" "deepseek_ec2_sg" {
   description = "Security group for EC2 instance"
   vpc_id      = data.aws_vpc.main_vpc.id
 
-  # Allow traffic from ALB on OpenWebUI & Ollama API
+  # Allow traffic from ALB
   ingress {
     from_port       = 8080
     to_port         = 8080
@@ -310,6 +310,81 @@ resource "aws_wafv2_web_acl" "deepseek_waf" {
     }
   } 
 
+# AWS Managed Known Bad Inputs Rule Set
+  rule {
+    name     = "KnownBadInputsRule"
+    priority = 3
+
+    override_action {
+      none {}
+    }
+
+    statement {
+      managed_rule_group_statement {
+        vendor_name = "AWS"
+        name        = "AWSManagedRulesKnownBadInputsRuleSet"
+      }
+    }
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "KnownBadInputsRule"
+      sampled_requests_enabled   = true
+    }
+  }
+
+
+# AWS Managed Common Rule Set
+rule {
+  name     = "CommonRuleSet"
+  priority = 4
+
+  override_action {
+    none {}  # Ensures AWS WAF applies its built-in block actions
+  }
+
+  statement {
+    managed_rule_group_statement {
+      vendor_name = "AWS"
+      name        = "AWSManagedRulesCommonRuleSet"
+
+      # Override specific rules that are set to "Count" by default, so they actually block bad traffic.
+      rule_action_override {
+        action_to_use {
+          block {}
+        }
+        name = "CrossSiteScripting_URIPATH_RC_COUNT"
+      }
+
+      rule_action_override {
+        action_to_use {
+          block {}
+        }
+        name = "CrossSiteScripting_BODY_RC_COUNT"
+      }
+
+      rule_action_override {
+        action_to_use {
+          block {}
+        }
+        name = "CrossSiteScripting_QUERYARGUMENTS_RC_COUNT"
+      }
+
+      rule_action_override {
+        action_to_use {
+          block {}
+        }
+        name = "CrossSiteScripting_COOKIE_RC_COUNT"
+      }
+    }
+  }
+
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "CommonRuleSet"
+    sampled_requests_enabled   = true
+  }
+}
+
   visibility_config {
     cloudwatch_metrics_enabled = true
     metric_name                = "deepseek-waf"
@@ -318,7 +393,7 @@ resource "aws_wafv2_web_acl" "deepseek_waf" {
 }
 
 
-#WAF Attachement to ALB
+#WAF Attachment to ALB
 resource "aws_wafv2_web_acl_association" "deepseek_waf_alb" {
   resource_arn = aws_lb.deepseek_lb.arn
   web_acl_arn  = aws_wafv2_web_acl.deepseek_waf.arn

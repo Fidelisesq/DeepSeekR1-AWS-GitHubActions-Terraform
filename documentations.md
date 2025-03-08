@@ -28,6 +28,7 @@ This approach **enhances security** while maintaining full operational control o
    - IAM Roles and Instance Profile
    - Route 53 DNS Record
    - Terraform Backend (S3)
+   - AWS WAF Configuration
 4. **GitHub Actions Workflow**
    - Workflow Triggers
    - Setup Job
@@ -51,20 +52,22 @@ Deploying machine learning models in production can be a complex task, especiall
 
 The goal of this project was to deploy the **DeepSeek Model R1** on AWS, making it accessible via a web interface (OpenWebUI) and an API (Ollama). The infrastructure includes:
 
-- **EC2 Instance**: Hosts the DeepSeek model in a Docker container and associated services.
+- **EC2 Instance**: Hosts the DeepSeek model in a Docker container and associated services in a private subnet.
+- **AWS Systems Manager (SSM)**: Provides secure connection to EC2 in private subnet via VPC Endpoints.
 - **Application Load Balancer (ALB)**: Distributes traffic to the EC2 instance and handles SSL termination.
 - **Security Groups**: Control inbound and outbound traffic to the ALB and EC2 instance.
 - **IAM Roles**: Provide the necessary permissions for the EC2 instance to allow AWS Systems Manager Access
 - **Route 53**: Manages DNS records for the ALB. I just employed a cetificate I already have in us-east-1 and a ready public hosted zone in same region.
 - **Terraform Backend**: Stores the Terraform state file in an S3 bucket for team collaboration.
+- **AWF**: Protects the backend against bad requests
 
 ---
 
-## 3. Terraform Configuration
+## 3. Terraform Configuration & Data 
 
 The Terraform configuration is the backbone of this project. It defines all the AWS resources required for the deployment. Below is a breakdown of the key components:
 
-### Provider Configuration
+### AWS Provider & VPC Configuration
 
 The first step in the Terraform configuration is to define the AWS provider and specify the region:
 
@@ -72,18 +75,55 @@ The first step in the Terraform configuration is to define the AWS provider and 
 provider "aws" {
   region = "us-east-1"
 }
+
+# Fetch existing VPC
+data "aws_vpc" "main_vpc" {
+  id = var.vpc_id
+}
 ```
 
 ### Security Groups
 
-Two security groups were created: one for the ALB and one for the EC2 instance. The ALB security group allows HTTPS traffic (port 443) and HTTP traffic (port 80) for testing purposes. It also allows TCP traffic on port 11434 for the Ollama API. The EC2 security group restricts traffic to only allow communication from the ALB on ports 8080 (OpenWebUI) and 11434 (Ollama API).
+I created 3 security groups: one for the ALB and one for the EC2 instance and the last for the VPC endpoints. The ALB security group allows HTTPS traffic (port 443). The EC2 security group restricts traffic to only allow communication from the ALB on ports 8080 (OpenWebUI) and the security group of the VPC endpoints.
 
 ```hcl
+## Security Group for EC2 (Only ALB can access it)
+resource "aws_security_group" "deepseek_ec2_sg" {
+  name        = "deepseek_ec2_sg"
+  description = "Security group for EC2 instance"
+  vpc_id      = data.aws_vpc.main_vpc.id
+
+  # Allow traffic from ALB 
+  ingress {
+    from_port       = 8080
+    to_port         = 8080
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
+  }
+
+  ingress {
+    from_port       = 11434
+    to_port         = 11434
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
+  }
+
+  # Allow all outbound traffic
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+## Security Group for ALB (Allows direct access)
 resource "aws_security_group" "alb_sg" {
   name        = "deepseek_alb_sg"
   description = "Security group for ALB"
-  vpc_id      = var.vpc_id
+  vpc_id      = data.aws_vpc.main_vpc.id
 
+  # Allow HTTPS from anywhere
   ingress {
     from_port   = 443
     to_port     = 443
@@ -91,20 +131,37 @@ resource "aws_security_group" "alb_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
+  # Allow all outbound traffic
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+## Security Group for VPC Endpoints
+resource "aws_security_group" "endpoint_sg" {
+  name        = "vpc-endpoint-sg"
+  description = "Security group for VPC Endpoints"
+  vpc_id      = data.aws_vpc.main_vpc.id
+
+  # Allow traffic from EC2 to VPC Endpoints
+  ingress {
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
+    security_groups = [aws_security_group.deepseek_ec2_sg.id]
   }
 
   ingress {
-    from_port = 11434
-    to_port = 11434
-    protocol = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    security_groups = [aws_security_group.deepseek_ec2_sg.id]
   }
 
+  # Allow all outbound traffic
   egress {
     from_port   = 0
     to_port     = 0
@@ -114,34 +171,91 @@ resource "aws_security_group" "alb_sg" {
 }
 ```
 
-### Load Balancer (ALB)
+### Load Balancer (ALB) & Listener
 
-The ALB is configured to listen on ports 443 (HTTPS) and 80 (HTTP). The HTTP listener redirects traffic to HTTPS for secure communication. Additionally, I set up a separate listener for the Ollama API on port 11434. Although this is not needed because the OpenWebUI already exposes the Ollama API. I just needed to have it as a standby maybe for direct API access programmatically.
+The ALB is configured to listen on ports 443 (HTTPS) and forwards traffic to the target group that has the EC2.
 
 ```hcl
+# Load Balancer
 resource "aws_lb" "deepseek_lb" {
   name               = "deepseek-alb"
-  internal           = false
+  internal           = false   # Public ALB
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb_sg.id]
-  subnets            = var.subnet_ids
+  subnets            = var.public_subnet_ids  # ALB must be in public subnets
+}
 
-  enable_deletion_protection = false
+## Listener for ALB (HTTPS) forwards traffic to OpenWebUI
+resource "aws_lb_listener" "https_listener" {
+  load_balancer_arn = aws_lb.deepseek_lb.arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-2016-08"
+  certificate_arn   = var.certificate_arn
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.deepseek_tg.arn
+  }
+}
+
+# Target Groups
+resource "aws_lb_target_group" "deepseek_tg" {
+  name     = "deepseek-target-group"
+  port     = 8080
+  protocol = "HTTP"
+  vpc_id   = data.aws_vpc.main_vpc.id
+
+  health_check {
+    path                = "/"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
 }
 ```
 
-### EC2 Instance
+### EC2, IAM & VPC Endpoints
 
 The EC2 instance is configured with a gp3 EBS volume (48GB) and an IAM role for necessary permissions. The instance is placed in a public subnet and associated with the EC2 security group. Note: `An instance with GPU support like p3.2xlarge, g4dn.xlarge etc would do better here to handle bigger model and process responses faster` but I didn't get one approved by AWS at the time of project execution. So, I used `c4.4xlarge`.
 
 ```hcl
+# IAM Role for SSM
+resource "aws_iam_role" "ssm_role" {
+  name = "EC2SSMRole"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Service = "ec2.amazonaws.com"
+      }
+      Action = "sts:AssumeRole"
+    }]
+  })
+}
+
+# Attach AmazonSSMManagedInstanceCore policy
+resource "aws_iam_role_policy_attachment" "ssm_policy" {
+  role       = aws_iam_role.ssm_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+# IAM Instance Profile
+resource "aws_iam_instance_profile" "ssm_instance_profile" {
+  name = "EC2SSMInstanceProfile"
+  role = aws_iam_role.ssm_role.name
+}
+
+# EC2 Instance
 resource "aws_instance" "deepseek_ec2" {
-  ami             = var.ami_id
-  instance_type   = var.instance_type
-  key_name        = data.aws_key_pair.existing_key.key_name
-  subnet_id       = var.public_subnet_id
-  security_groups = [aws_security_group.deepseek_ec2_sg.id]
-  iam_instance_profile = aws_iam_instance_profile.deepseek_ec2_profile.name
+  ami                  = var.ami_id
+  instance_type        = var.instance_type
+  subnet_id            = var.private_subnet_ids[0]
+  security_groups      = [aws_security_group.deepseek_ec2_sg.id]
+  iam_instance_profile = aws_iam_instance_profile.ssm_instance_profile.name
 
   root_block_device {
     volume_size           = 48
@@ -153,36 +267,46 @@ resource "aws_instance" "deepseek_ec2" {
     Name = "DeepSeekModelInstance"
   }
 }
-```
 
-### IAM Roles and Instance Profile
+# Attach EC2 Instance to Target Group
+resource "aws_lb_target_group_attachment" "deepseek_tg_attachment" {
+  target_group_arn = aws_lb_target_group.deepseek_tg.arn
+  target_id        = aws_instance.deepseek_ec2.id
+  port             = 8080
+}
 
-An IAM role is created for the EC2 instance, allowing it to assume the role and access necessary AWS resources. At first, I wanted to copy the model from an S3 bucket, so I created this EC2 resource. So, I don't need this now because I opted to use a docker image but will keep it for future modifications. 
+# VPC Endpoints for SSM
+resource "aws_vpc_endpoint" "ssm" {
+  vpc_id            = data.aws_vpc.main_vpc.id
+  service_name      = "com.amazonaws.us-east-1.ssm"
+  vpc_endpoint_type = "Interface"
+  subnet_ids        = var.private_subnet_ids
+  security_group_ids = [aws_security_group.endpoint_sg.id]
+  private_dns_enabled = true
+}
 
-```hcl
-resource "aws_iam_role" "deepseek_ec2_role" {
-  name = "deepseek_ec2_role"
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "ec2.amazonaws.com"
-        }
-      }
-    ]
-  })
+# VPC Endpoint for EC2 Messages (Used by SSM)
+resource "aws_vpc_endpoint" "ec2_messages" {
+  vpc_id            = data.aws_vpc.main_vpc.id
+  service_name      = "com.amazonaws.us-east-1.ec2messages"
+  vpc_endpoint_type = "Interface"
+  subnet_ids        = var.private_subnet_ids
+  security_group_ids = [aws_security_group.endpoint_sg.id]
+  private_dns_enabled = true
+}
+
+# VPC Endpoint for SSM Messages (Used by SSM)
+resource "aws_vpc_endpoint" "ssm_messages" {
+  vpc_id            = data.aws_vpc.main_vpc.id
+  service_name      = "com.amazonaws.us-east-1.ssmmessages"
+  vpc_endpoint_type = "Interface"
+  subnet_ids        = var.private_subnet_ids
+  security_group_ids = [aws_security_group.endpoint_sg.id]
+  private_dns_enabled = true
 }
 ```
-```hcl
-resource "aws_iam_instance_profile" "deepseek_ec2_profile" {
-  name = "deepseek_ec2_profile"
-  role = aws_iam_role.deepseek_ec2_role.name
-}
-```
+
 
 ### Route 53 DNS Record
 
@@ -202,6 +326,177 @@ resource "aws_route53_record" "deepseek_dns" {
 }
 ```
 
+### AWS WAF Configuration
+#AWS Web Application Firewall
+resource "aws_wafv2_web_acl" "deepseek_waf" {
+  name        = "deepseek-waf"
+  description = "WAF for ALB protecting backend"
+  scope       = "REGIONAL"
+
+  default_action {
+    allow {}
+  }
+
+  # Rate Limiting Rule
+  rule {
+    name     = "RateLimitRule"
+    priority = 1
+
+    action {
+      block {}
+    }
+
+    statement {
+      rate_based_statement {
+        limit              = 150
+        aggregate_key_type = "IP"
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "RateLimit"
+      sampled_requests_enabled   = true
+    }
+  }
+
+# Amazon IP Reputation List (Blocks known bad IPs, reconnaissance, DDoS)
+  rule {
+    name     = "AmazonIPReputationRule"
+    priority = 2
+
+    override_action { 
+      none {} 
+    }
+
+    statement {
+      managed_rule_group_statement {
+        vendor_name = "AWS"
+        name        = "AWSManagedRulesAmazonIpReputationList"
+
+        # OPTIONAL: Override specific rules inside the group
+        rule_action_override {
+          action_to_use {
+            block {}
+          }
+          name = "AWSManagedIPReputationList"
+        }
+
+        rule_action_override {
+          action_to_use {
+            block {}
+          }
+          name = "AWSManagedReconnaissanceList"
+        }
+
+        rule_action_override {
+          action_to_use {
+            count {}
+          }
+          name = "AWSManagedIPDDoSList"
+        }
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "AmazonIPReputationRule"
+      sampled_requests_enabled   = true
+    }
+  } 
+
+# AWS Managed Known Bad Inputs Rule Set
+  rule {
+    name     = "KnownBadInputsRule"
+    priority = 3
+
+    override_action {
+      none {}
+    }
+
+    statement {
+      managed_rule_group_statement {
+        vendor_name = "AWS"
+        name        = "AWSManagedRulesKnownBadInputsRuleSet"
+      }
+    }
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "KnownBadInputsRule"
+      sampled_requests_enabled   = true
+    }
+  }
+
+
+# AWS Managed Common Rule Set
+rule {
+  name     = "CommonRuleSet"
+  priority = 4
+
+  override_action {
+    none {}  # Ensures AWS WAF applies its built-in block actions
+  }
+
+  statement {
+    managed_rule_group_statement {
+      vendor_name = "AWS"
+      name        = "AWSManagedRulesCommonRuleSet"
+
+      # Override specific rules that are set to "Count" by default, so they actually block bad traffic.
+      rule_action_override {
+        action_to_use {
+          block {}
+        }
+        name = "CrossSiteScripting_URIPATH_RC_COUNT"
+      }
+
+      rule_action_override {
+        action_to_use {
+          block {}
+        }
+        name = "CrossSiteScripting_BODY_RC_COUNT"
+      }
+
+      rule_action_override {
+        action_to_use {
+          block {}
+        }
+        name = "CrossSiteScripting_QUERYARGUMENTS_RC_COUNT"
+      }
+
+      rule_action_override {
+        action_to_use {
+          block {}
+        }
+        name = "CrossSiteScripting_COOKIE_RC_COUNT"
+      }
+    }
+  }
+
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "CommonRuleSet"
+    sampled_requests_enabled   = true
+  }
+}
+
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "deepseek-waf"
+    sampled_requests_enabled   = true
+  }
+}
+
+
+#WAF Attachment to ALB
+resource "aws_wafv2_web_acl_association" "deepseek_waf_alb" {
+  resource_arn = aws_lb.deepseek_lb.arn
+  web_acl_arn  = aws_wafv2_web_acl.deepseek_waf.arn
+  depends_on = [aws_lb.deepseek_lb,
+  aws_wafv2_web_acl.deepseek_waf
+  ]
+}
+
 ### Terraform Backend (S3)
 
 The Terraform state file is stored in an S3 bucket to enable team collaboration and state management.
@@ -217,44 +512,34 @@ terraform {
 }
 ```
 
+
 ### Variables Configuration
 
 The variables.tf file defines all the input variables required for the Terraform configuration. These variables make the configuration reusable and customizable.
 
 ```hcl
-variable "aws_region" {
-  description = "AWS region to deploy resources"
-  type        = string
-  default     = "us-east-1"
-}
-
 variable "vpc_id" {
-  description = "Existing VPC ID where resources will be deployed"
+  description = "The VPC ID where resources will be deployed"
   type        = string
 }
 
-variable "subnet_ids" {
-  description = "Subnet ID for the ALB"
+variable "public_subnet_ids" {
+  description = "List of public subnet IDs for ALB"
   type        = list(string)
 }
 
-variable "public_subnet_id" {
-  description = "Public subnet ID for the EC2 instance"
-  type        = string
-}
-
-variable "key_name" {
-  description = "Key ID for EC2 instance"
-  type        = string
-}
-
-variable "key_id" {
-  description = "The ID of the key pair to use for the EC2 instance"
-  type        = string
+variable "private_subnet_ids" {
+  description = "List of private subnet IDs for EC2 instances"
+  type        = list(string)
 }
 
 variable "ami_id" {
-  description = "Amazon Machine Image (AMI) ID"
+  description = "AMI ID for the EC2 instance"
+  type        = string
+}
+
+variable "instance_type" {
+  description = "Instance type for the EC2 instance"
   type        = string
 }
 
@@ -264,22 +549,7 @@ variable "certificate_arn" {
 }
 
 variable "hosted_zone_id" {
-  description = "ID of the existing Route 53 hosted zone for fozdigitalz.com in us-east-1"
-  type        = string
-}
-
-variable "terraform_state_bucket" {
-  description = "The name of the S3 bucket for Terraform state"
-  type        = string
-}
-
-variable "instance_type" {
-  description = "Instance type for the EC2 instance"
-  type        = string
-}
-
-variable "my_ip" {
-  description = "IP address allowed to SSH"
+  description = "Route 53 hosted zone ID for the domain"
   type        = string
 }
 ```
@@ -289,18 +559,14 @@ variable "my_ip" {
 The `terraform.tfvars` file is used to assign values to the variables defined in variables.tf. This file is typically not committed to version control (e.g., Git) for security reasons, as it may contain sensitive information like AWS credentials. I added `terraform.tfvars` to `.gitignore` so it won't be tracked. I provided the variables and secrets in github using `environment variables` and `secrets`. Also, the values below are made up and not real.
 
 ```hcl
-aws_region              = "us-east-1"
-vpc_id                  = "vpc-1234567890abcdef0"
-subnet_ids              = ["subnet-1234567890abcdef0", "subnet-0987654321abcdef0"]
-public_subnet_id        = "subnet-1234567890abcdef0"
-key_name                = "my-key-pair"
-key_id                  = "key-1234567890abcdef0"
-ami_id                  = "ami-0abcdef1234567890"
-certificate_arn         = "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
-hosted_zone_id          = "Z1234567890ABCDEF"
-terraform_state_bucket  = "foz-terraform-state-bucket"
-instance_type           = "c4.4xlarge"
-my_ip                   = "192.168.1.1/32"
+vpc_id = "vpc-012345678910"
+private_subnet_ids = ["subnet-0012345678910", "subnet-0012345678910", "subnet-0012345678910"]
+instance_type = "c4.4xlarge" # bigger for production but t2.2xlarge test
+ami_id = "ami-04b4f1a9cf54c11d0"
+certificate_arn   = "arn:aws:acm:us-east-1:012345678910:certificate/697cf89b-9931-435f-a5f0-c8f012345678910c"
+hosted_zone_id    = "Z012345678960X9UZZVPUYYW0H"
+public_subnet_ids = ["subnet-0012345678910","subnet-012345678910"]
+
 ```
 
 ### Output Configuration
@@ -308,19 +574,23 @@ my_ip                   = "192.168.1.1/32"
 The output.tf file defines the outputs that Terraform will display after applying the configuration. I used these outputs for retrieving information like the EC2 instance’s public IP or the ALB’s DNS name that are needed for my `Github Action workflow` to configure my EC2 instances.
 ```hcl
 output "ec2_public_ip" {
-  description = "Public IP address of the EC2 instance"
+  description = "Public IP of the EC2 instance"
   value       = aws_instance.deepseek_ec2.public_ip
 }
 
 output "lb_url" {
-  description = "DNS name of the Application Load Balancer"
+  description = "DNS name of the ALB"
   value       = aws_lb.deepseek_lb.dns_name
 }
 
 output "deepseek_ec2_sg_id" {
-  description = "Security Group ID of the EC2 instance"
-  value       = aws_security_group.deepseek_ec2_sg.id
+  value = aws_security_group.deepseek_ec2_sg.id
 }
+
+output "deepseek_ec2_id" {
+  value = aws_instance.deepseek_ec2.id
+}
+
 ```
 ---
 
@@ -354,6 +624,23 @@ on:
 The **setup** job initializes the environment by checking out the code, setting up Terraform, and configuring AWS credentials.
 
 ```yaml
+name: Deploying DeepSeek Model R1 on AWS via Terraform & GitHub Actions
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Choose action (apply/destroy)"
+        required: true
+        default: "apply"
+        type: choice
+        options:
+          - apply
+          - destroy
+
 jobs:
   setup:
     runs-on: ubuntu-latest
@@ -379,6 +666,8 @@ The **apply** job runs Terraform to create the infrastructure. It generates a `t
 ```yaml
   apply:
     runs-on: ubuntu-latest
+    outputs:
+      ec2_instance_id: ${{ steps.get_ec2_id.outputs.ec2_id }}
     needs: setup
     if: |
       (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply') ||
@@ -403,42 +692,58 @@ The **apply** job runs Terraform to create the infrastructure. It generates a `t
           ami_id = "${{ secrets.AMI_ID }}"
           certificate_arn = "${{ secrets.CERTIFICATE_ARN }}"
           vpc_id = "${{ secrets.VPC_ID }}"
-          subnet_ids = [${{ secrets.SUBNET_IDS }}]
-          key_name = "${{ secrets.KEY_NAME }}"
-          key_id = "${{ secrets.KEY_ID }}"
           hosted_zone_id = "${{ secrets.HOSTED_ZONE_ID }}"
           instance_type = "${{ secrets.INSTANCE_TYPE }}"
-          my_ip = "${{ secrets.MY_IP }}"
           aws_access_key_id = "${{ secrets.AWS_ACCESS_KEY_ID }}"
           aws_secret_access_key = "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
           aws_region = "${{ secrets.AWS_DEFAULT_REGION }}"
-          public_subnet_id = "${{ secrets.PUBLIC_SUBNET_ID }}"
-          terraform_state_bucket = "${{ secrets.TERRAFORM_STATE_BUCKET }}"
+          public_subnet_ids = ${{ secrets.PUBLIC_SUBNET_IDS }}
+          private_subnet_ids = ${{ secrets.PRIVATE_SUBNET_IDS }}
           EOF
 
-      - name: Terraform Init
+      - name: Mask AWS Account ID in Logs
+        run: echo "::add-mask::${{ secrets.AWS_ACCOUNT_ID }}"
+
+      - name: Terraform Init & Apply
         run: |
           terraform init \
             -backend-config="bucket=${{ secrets.TERRAFORM_STATE_BUCKET }}" \
             -backend-config="key=infra.tfstate" \
             -backend-config="region=${{ secrets.AWS_DEFAULT_REGION }}"
+          terraform apply -auto-approve -var-file=terraform.tfvars
 
-      - name: Terraform Plan
-        run: terraform plan -out=tfplan -var-file=terraform.tfvars
+      - name: Retrieve EC2 Instance ID
+        id: get_ec2_id
+        run: |
+          echo "Retrieving EC2 Instance ID..."
+          EC2_ID=$(terraform output -raw deepseek_ec2_id)
+          echo "EC2_INSTANCE_ID=$EC2_ID" >> $GITHUB_ENV
+          echo "::set-output name=ec2_id::$EC2_ID"
+        
 
-      - name: Terraform Apply
-        run: terraform apply -auto-approve -var-file=terraform.tfvars
+      - name: Verify EC2 Instance ID
+        run: |
+          echo "EC2_INSTANCE_ID=${{ env.EC2_INSTANCE_ID }}"
+          if [ -z "${{ env.EC2_INSTANCE_ID }}" ]; then
+            echo "EC2 instance ID is empty or invalid."
+            exit 1
+          fi
+          
+      - name: Wait for EC2
+        run: sleep 60    
 ```
 
 ### Post-Apply Job
 
-The **post-apply** job retrieves Terraform outputs, updates the EC2 security group to allow SSH access from the GitHub runner, installs Docker on the EC2 instance, and deploys the DeepSeek Model and OpenWebUI using Docker.
+The **post-apply** job configures the EC2 instance after Terraform provisions it. It verifies the instance's connection via AWS SSM, checks if the SSM agent is running, and installs Docker along with necessary dependencies. After rebooting the instance, it deploys the **DeepSeek Model R1** inside an **Ollama** container and sets up **Open WebUI** for interaction. Finally, it confirms that the WebUI is accessible via `https://deepseek.fozdigitalz.com`. This ensures a fully automated deployment of the model and web interface on AWS.
 
 ```yaml
   post_apply:
     runs-on: ubuntu-latest
     needs: apply
     if: success()
+    env:
+      EC2_INSTANCE_ID: ${{ needs.apply.outputs.ec2_instance_id }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -453,87 +758,92 @@ The **post-apply** job retrieves Terraform outputs, updates the EC2 security gro
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
 
-      - name: Retrieve Terraform Outputs
-        id: tf_outputs
+
+      - name: Create terraform.tfvars
         run: |
-          echo "Retrieving Terraform Outputs..."
-          echo "EC2_PUBLIC_IP=$(terraform output -raw ec2_public_ip)" >> $GITHUB_ENV
-          echo "LB_DNS=$(terraform output -raw lb_url)" >> $GITHUB_ENV
-
-      - name: Retrieve EC2 Security Group ID
-        id: get_sg_id
-        run:  |
-          SECURITY_GROUP_ID=$(terraform output -raw deepseek_ec2_sg_id)
-          echo "SECURITY_GROUP_ID=$SECURITY_GROUP_ID" >> $GITHUB_ENV
-
-      - name: Add GitHub Runner IP to Security Group
-        run: |
-          RUNNER_IP=$(curl -s https://checkip.amazonaws.com)
-          echo "Runner IP: $RUNNER_IP"
-          aws ec2 authorize-security-group-ingress \
-            --group-id "${{ env.SECURITY_GROUP_ID }}" \
-            --protocol tcp \
-            --port 22 \
-            --cidr "$RUNNER_IP/32" || echo "Failed to add rule to EC2 Security Group"
-
-      - name: Wait for Security Group to Update
-        run: sleep 12
-
-      - name: Save SSH Private Key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 --decode > ~/.ssh/my-key.pem
-          chmod 600 ~/.ssh/my-key.pem
-
-      - name: Verify SSH Connection
-        run: |
-           ssh -o StrictHostKeyChecking=no -i ~/.ssh/my-key.pem ubuntu@${{ env.EC2_PUBLIC_IP }} 
-           echo "SSH Connection Successful"
-
-      - name: Install Docker on EC2
-        run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/my-key.pem ubuntu@${{ env.EC2_PUBLIC_IP }} <<EOF
-          sudo apt-get update
-          sudo apt-get install -y docker.io docker-compose
-          sudo systemctl enable docker
-          sudo systemctl start docker
-          sudo usermod -aG docker ubuntu
-          sudo sed -i 's/^ENABLED=1/ENABLED=0/' /etc/apt/apt.conf.d/20auto-upgrades
-          sudo reboot
+          cat <<EOF > terraform.tfvars
+          ami_id = "${{ secrets.AMI_ID }}"
+          certificate_arn = "${{ secrets.CERTIFICATE_ARN }}"
+          vpc_id = "${{ secrets.VPC_ID }}"
+          hosted_zone_id = "${{ secrets.HOSTED_ZONE_ID }}"
+          instance_type = "${{ secrets.INSTANCE_TYPE }}"
+          aws_access_key_id = "${{ secrets.AWS_ACCESS_KEY_ID }}"
+          aws_secret_access_key = "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+          aws_region = "${{ secrets.AWS_DEFAULT_REGION }}"
+          public_subnet_ids = ${{ secrets.PUBLIC_SUBNET_IDS }}
+          private_subnet_ids = ${{ secrets.PRIVATE_SUBNET_IDS }}
           EOF
 
-      - name: Wait for EC2 Instance to Reboot
-        run: sleep 60
-
-      - name: Run DeepSeek Model and WebUI via Docker
+    
+      - name: Verify SSM Connection
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/my-key.pem ubuntu@${{ env.EC2_PUBLIC_IP }} <<EOF
-          docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
-          sleep 20
-          docker exec ollama ollama pull deepseek-r1:8b
-          sleep 15
-          docker exec -d ollama ollama serve
-          sleep 15
-          docker run -d -p 8080:8080 --add-host=host.docker.internal:host-gateway -v open-webui:/app/backend/data --name open-webui --restart always ghcr.io/open-webui/open-webui:main
-          sleep 15
-          EOF
+          echo "Verifying SSM Connection..."
+          aws ssm describe-instance-information --region ${{ secrets.AWS_DEFAULT_REGION }} \
+            --query "InstanceInformationList[?InstanceId=='${{ env.EC2_INSTANCE_ID }}']" \
+            --output json
+        #env:
+          #TF_LOG: DEBUG
 
-      - name: Confirm WebUI is Running & Accessible via Custom Domain
+      - name: Check SSM Agent Status
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/my-key.pem ubuntu@${{ env.EC2_PUBLIC_IP }} <<EOF
-          curl -I https://deepseek.fozdigitalz.com
-          EOF
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --instance-ids "${{ env.EC2_INSTANCE_ID }}" \
+            --parameters '{"commands":["sudo systemctl status amazon-ssm-agent"]}' \
+            --region ${{ secrets.AWS_DEFAULT_REGION }}
+        #env:
+          #TF_LOG: DEBUG
+               
 
-      - name: Remove GitHub Runner IP from Security Group
-        if: always()
+      - name: Install Docker via SSM
         run: |
-            RUNNER_IP=$(curl -s https://checkip.amazonaws.com)
-            echo "Removing Runner IP: $RUNNER_IP"
-            aws ec2 revoke-security-group-ingress \
-              --group-id "${{ env.SECURITY_GROUP_ID }}" \
-              --protocol tcp \
-              --port 22 \
-              --cidr "$RUNNER_IP/32"
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "[{\"Key\":\"InstanceIds\",\"Values\":[\"${{ env.EC2_INSTANCE_ID }}\"]}]" \
+            --parameters commands='[
+              "sudo apt-get update",
+              "sudo apt-get install -y docker.io docker-compose",
+              "sudo systemctl enable docker",
+              "sudo systemctl start docker",
+              "sudo usermod -aG docker ubuntu",
+              "sudo sed -i s/^ENABLED=1/ENABLED=0/ /etc/apt/apt.conf.d/20auto-upgrades",
+              "sleep 10",
+              "sudo reboot"
+            ]' \
+            --region ${{ secrets.AWS_DEFAULT_REGION }}
+          
+      - name: Wait for EC2 instance to reboot ..."
+        run: sleep 50
+
+
+      - name: Run DeepSeek Model and WebUI via SSM
+        run: |
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "[{\"Key\":\"InstanceIds\",\"Values\":[\"${{ env.EC2_INSTANCE_ID }}\"]}]" \
+            --parameters commands='[
+              "docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama",
+              "sleep 20",
+              "docker exec ollama ollama pull deepseek-r1:8b",
+              "sleep 15",
+              "docker exec -d ollama ollama serve",
+              "sleep 15",
+              "docker run -d -p 8080:8080 --add-host=host.docker.internal:host-gateway -v open-webui:/app/backend/data --name open-webui --restart always ghcr.io/open-webui/open-webui:main",
+              "sleep 15"
+            ]' \
+            --region ${{ secrets.AWS_DEFAULT_REGION }}
+      
+          echo "Waiting for WebUI to start..."
+          sleep 30              
+
+      - name: Confirm WebUI is Running
+        run: |
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets '[{"Key":"instanceIds","Values":["${{ env.EC2_INSTANCE_ID }}"]}]' \
+            --parameters '{"commands":["curl -I https://deepseek.fozdigitalz.com"]}' \
+            --region ${{ secrets.AWS_DEFAULT_REGION }}
+
 ```
 
 ### Destroy Job
@@ -560,27 +870,26 @@ The **destroy** job tears down the infrastructure when triggered manually or via
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
-
+      
       - name: Create terraform.tfvars
         run: |
           cat <<EOF > terraform.tfvars
           ami_id = "${{ secrets.AMI_ID }}"
           certificate_arn = "${{ secrets.CERTIFICATE_ARN }}"
           vpc_id = "${{ secrets.VPC_ID }}"
-          subnet_ids = [${{ secrets.SUBNET_IDS }}]
-          key_name = "${{ secrets.KEY_NAME }}"
-          key_id = "${{ secrets.KEY_ID }}"
           hosted_zone_id = "${{ secrets.HOSTED_ZONE_ID }}"
           instance_type = "${{ secrets.INSTANCE_TYPE }}"
-          my_ip = "${{ secrets.MY_IP }}"
           aws_access_key_id = "${{ secrets.AWS_ACCESS_KEY_ID }}"
           aws_secret_access_key = "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
           aws_region = "${{ secrets.AWS_DEFAULT_REGION }}"
-          public_subnet_id = "${{ secrets.PUBLIC_SUBNET_ID }}"
-          terraform_state_bucket = "${{ secrets.TERRAFORM_STATE_BUCKET }}"
+          public_subnet_ids = ${{ secrets.PUBLIC_SUBNET_IDS }}
+          private_subnet_ids = ${{ secrets.PRIVATE_SUBNET_IDS }}
           EOF
+  
+      - name: Mask AWS Account ID in Logs
+        run: echo "::add-mask::${{ secrets.AWS_ACCOUNT_ID }}"
 
-      - name: Terraform Init & Destroy
+      - name: Terraform Destroy
         run: |
           terraform init -reconfigure \
             -backend-config="bucket=${{ secrets.TERRAFORM_STATE_BUCKET }}" \
@@ -630,15 +939,7 @@ I can destroy my infrastructure when I trigger my workflow in different ways. My
 ![terraform destroy](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/Terraform%20destroy.png)
 `Infrastructure cleanup using terraform`
 
-### **4. Model Performance Metrics & Instance Metrics**
-Using the Ollama API, I measured the model’s response time and resource utilization. Here’s a summary of the performance:
-
-- **Average Response Time**: 1.2 seconds
-- **CPU Utilization**: 26.8%
-- **Memory Usage**: 13.65 GB
-![CPU Metrics](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/Instance%20Metrics.png)
-
-## 6. Challenges Faced & Lesson Learned
+## **6. Challenges Faced & Lesson Learned**
 
 Deploying the DeepSeek Model R1 on AWS using Terraform and GitHub Actions presented several challenges, each of which taught valuable lessons for improving the deployment process and infrastructure design.
 
