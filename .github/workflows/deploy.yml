@@ -143,8 +143,7 @@ jobs:
           aws ssm describe-instance-information --region ${{ secrets.AWS_DEFAULT_REGION }} \
             --query "InstanceInformationList[?InstanceId=='${{ env.EC2_INSTANCE_ID }}']" \
             --output json
-        #env:
-          #TF_LOG: DEBUG
+        
 
       - name: Check SSM Agent Status
         run: |
