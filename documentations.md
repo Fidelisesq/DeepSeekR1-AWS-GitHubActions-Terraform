@@ -924,7 +924,7 @@ I tested the model by asking it a few questions. Here’s an example of the mode
 
 
 Click the image below to watch the project breakdown and result video on YouTube!
-[![Watch the video](https://img.youtube.com/vi/j1yubSvJX5U/maxresdefault.jpg)](https://www.youtube.com/watch?v=j1yubSvJX5U)
+[![DeepSeek Model R1 Setup](https://img.youtube.com/vi/j1yubSvJX5U/maxresdefault.jpg)](https://www.youtube.com/watch?v=j1yubSvJX5U)
 
 
 ### **3. Infrastructure Clean Up**
