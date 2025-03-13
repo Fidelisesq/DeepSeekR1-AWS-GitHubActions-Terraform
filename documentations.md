@@ -922,6 +922,11 @@ I tested the model by asking it a few questions. Here’s an example of the mode
 ![Sample model response 22](https://github.com/Fidelisesq/DeepSeekR1-AWS-GitHubActions-Terraform/blob/main/Images/model-response-22.png)
 `Sample model response 22`
 
+
+Click the image below to watch the project breakdown and result video on YouTube!
+[![Watch the video](https://img.youtube.com/vi/j1yubSvJX5U/maxresdefault.jpg)](https://www.youtube.com/watch?v=j1yubSvJX5U)
+
+
 ### **3. Infrastructure Clean Up**
 I can destroy my infrastructure when I trigger my workflow in different ways. My workflow will be triggered by pushing to the main branch or manually through the GitHub UI using workflow dispatch with an input to choose the action (apply/destroy).
 - By manually triggering the workflow from the GitHub UI and selecting the `destroy` action.

@@ -196,7 +196,7 @@ jobs:
             --region ${{ secrets.AWS_DEFAULT_REGION }}
       
           echo "Waiting for WebUI to start..."
-          sleep 30              
+          sleep 60          
 
       - name: Confirm WebUI is Running
         run: |
